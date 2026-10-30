@@ -223,7 +223,7 @@
       clouds: [],
       boss: null,
       bossSpawned: false,
-      bossHealth: 0
+      enemyShots: []
     };
 
     function rand(min, max) { return min + Math.random() * (max - min); }
@@ -232,7 +232,7 @@
     function setCombo(multiplier) {
       game.combo = multiplier;
       comboText.textContent = 'Combo: x' + game.combo;
-      game.comboTimer = 120;
+      game.comboTimer = 130;
     }
 
     function updateCombo() {
@@ -285,14 +285,15 @@
     function makeBoss() {
       return {
         x: canvas.width / 2,
-        y: -40,
-        r: 42,
-        speed: 1.1,
-        health: 8,
+        y: -60,
+        r: 46,
+        speed: 1.2,
+        health: 12,
         boss: true,
         phase: 0,
         tilt: 0,
-        z: 1.4
+        z: 1.6,
+        fireCooldown: 80
       };
     }
 
@@ -306,12 +307,12 @@
       game.spawnTimer = 0;
       game.enemies = [];
       game.bullets = [];
+      game.enemyShots = [];
       game.particles = [];
       game.player.x = canvas.width / 2;
       game.player.y = canvas.height - 50;
       game.boss = null;
       game.bossSpawned = false;
-      game.bossHealth = 0;
       initClouds();
 
       scoreText.textContent = 'Score: 0';
@@ -334,6 +335,18 @@
         speed: 10,
         radius: 7,
         trail: []
+      });
+    }
+
+    function spawnBossShot(enemy) {
+      game.enemyShots.push({
+        x: enemy.x,
+        y: enemy.y + 18,
+        targetX: game.player.x,
+        targetY: game.player.y,
+        speed: 4.2,
+        radius: 9,
+        color: '#d64545'
       });
     }
 
@@ -381,7 +394,7 @@
         if (enemy.health <= 0) {
           killEnemy(enemyIndex, true);
         } else {
-          messageEl.textContent = 'Boss hit! Keep hitting it!';
+          messageEl.textContent = 'Boss hit! Keep piling on the damage!';
         }
         return;
       }
@@ -437,6 +450,36 @@
       }
     }
 
+    function updateEnemyShots() {
+      for (let i = game.enemyShots.length - 1; i >= 0; i--) {
+        const shot = game.enemyShots[i];
+        const dx = shot.targetX - shot.x;
+        const dy = shot.targetY - shot.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        shot.x += (dx / dist) * shot.speed;
+        shot.y += (dy / dist) * shot.speed;
+
+        if (Math.hypot(shot.x - game.player.x, shot.y - game.player.y) < 22) {
+          game.enemyShots.splice(i, 1);
+          game.lives -= 1;
+          livesText.textContent = 'Lives: ' + game.lives;
+          messageEl.textContent = 'The boss shot you! Stay moving!';
+
+          if (game.lives <= 0) {
+            game.over = true;
+            messageEl.textContent = 'Banana Baby got overwhelmed. Press PLAY AGAIN!';
+            startButton.textContent = 'PLAY AGAIN';
+          }
+          continue;
+        }
+
+        if (shot.x < -20 || shot.x > canvas.width + 20 || shot.y < -20 || shot.y > canvas.height + 20) {
+          game.enemyShots.splice(i, 1);
+        }
+      }
+    }
+
     function updateEnemies() {
       game.spawnTimer += 1;
       if (!game.boss && game.spawnTimer > 42) {
@@ -451,15 +494,17 @@
         if (enemy.boss) {
           enemy.phase += 0.08;
           enemy.x += Math.sin(enemy.phase) * 2.2;
-          enemy.y = Math.min(enemy.y + 0.6, 100);
+          enemy.y = Math.min(enemy.y + enemy.speed * 1.2, 110);
           enemy.tilt = Math.sin(enemy.phase) * 0.5;
+          enemy.fireCooldown -= 1;
+
+          if (enemy.fireCooldown <= 0) {
+            spawnBossShot(enemy);
+            enemy.fireCooldown = 80;
+          }
 
           if (enemy.x < 50 || enemy.x > canvas.width - 50) {
             enemy.x = clamp(enemy.x, 50, canvas.width - 50);
-          }
-
-          if (enemy.y > 110) {
-            enemy.y = 110;
           }
 
           if (enemy.health <= 0) {
@@ -583,6 +628,25 @@
       ctx.restore();
     }
 
+    function drawBossBar() {
+      if (!game.boss) return;
+
+      const width = 220;
+      const x = (canvas.width - width) / 2;
+      const y = 18;
+      const hpRatio = clamp(game.boss.health / 12, 0, 1);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(x, y, width, 18);
+
+      ctx.fillStyle = '#d64545';
+      ctx.fillRect(x + 2, y + 2, (width - 4) * hpRatio, 14);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('FRUIT FLY KING', x + 44, y + 13);
+    }
+
     function drawBoss(enemy) {
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
@@ -651,10 +715,6 @@
       ctx.fillStyle = '#6d6d6d';
       ctx.fillRect(-52, -8, 12, 6);
       ctx.fillRect(40, -8, 12, 6);
-
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('BOSS', -18, 52);
       ctx.restore();
     }
 
@@ -717,6 +777,13 @@
       ctx.restore();
     }
 
+    function drawEnemyShot(shot) {
+      ctx.fillStyle = shot.color;
+      ctx.beginPath();
+      ctx.arc(shot.x, shot.y, shot.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     function drawBullet(bullet) {
       bullet.trail.forEach((point, index) => {
         ctx.fillStyle = 'rgba(255, 200, 70, ' + (0.2 + index / bullet.trail.length) + ')';
@@ -744,8 +811,10 @@
       drawBackground();
       for (const enemy of game.enemies) drawEnemy(enemy);
       for (const bullet of game.bullets) drawBullet(bullet);
+      for (const shot of game.enemyShots) drawEnemyShot(shot);
       drawParticles();
       drawPlayer();
+      drawBossBar();
     }
 
     function gameLoop(timestamp) {
@@ -760,6 +829,7 @@
         checkBossSpawn();
         updateEnemies();
         updateBullets();
+        updateEnemyShots();
         updateParticles();
       }
 
