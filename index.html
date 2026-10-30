@@ -645,10 +645,16 @@
 
     function updateEnemies() {
       game.spawnTimer += 1;
-      if (!game.boss && !game.bossDefeated && game.spawnTimer > 42) {
+      if (!game.boss && !game.bossDefeated && game.spawnTimer > 30) {
         game.spawnTimer = 0;
-        if (game.enemies.filter(e => !e.boss).length < 10) {
-          game.enemies.push(makeEnemy());
+        const normalEnemies = game.enemies.filter(e => !e.boss).length;
+        const spawnLimit = 18;
+        const spawnCount = Math.min(3, spawnLimit - normalEnemies);
+
+        if (spawnCount > 0) {
+          for (let i = 0; i < spawnCount; i++) {
+            game.enemies.push(makeEnemy());
+          }
         }
       }
 
