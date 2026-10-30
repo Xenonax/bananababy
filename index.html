@@ -11,14 +11,13 @@
       --sky: #fffbe8;
       --panel: #fffdf6;
       --shadow: rgba(0, 0, 0, 0.12);
-      --coconut: #9a5d2d;
+      --coconut: #8a5c39;
       --grass: #6bbd63;
       --text: #3b2a1d;
+      --enemy: #7a573f;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -34,11 +33,12 @@
       font-size: clamp(2.2rem, 4vw, 3rem);
       color: #e8a33d;
       margin-bottom: 0.4rem;
+      line-height: 1.1;
     }
 
     p {
       font-size: 1.1rem;
-      margin: 0.5rem 0;
+      margin: 0.45rem 0;
     }
 
     img {
@@ -59,7 +59,8 @@
 
     #message {
       min-height: 26px;
-      font-weight: 600;
+      font-weight: 700;
+      color: var(--text);
     }
 
     button {
@@ -72,7 +73,7 @@
       cursor: pointer;
       margin-top: 8px;
       transition: transform 0.15s ease, background 0.15s ease;
-      font-weight: 700;
+      font-weight: 800;
       letter-spacing: 0.04em;
     }
 
@@ -90,6 +91,7 @@
       border-radius: 18px;
       box-shadow: 0 8px 20px rgba(89, 56, 16, 0.15);
       margin: 18px auto 0;
+      cursor: crosshair;
     }
 
     #hud {
@@ -97,7 +99,7 @@
       margin: 14px auto 0;
       display: none;
       justify-content: space-between;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--text);
       background: rgba(255,255,255,0.55);
       border-radius: 10px;
@@ -116,11 +118,11 @@
   </div>
 
   <div id="hud">
-    <span id="scoreText">Bananas: 0</span>
+    <span id="scoreText">Score: 0</span>
     <span id="livesText">Lives: 3</span>
   </div>
 
-  <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby 2D game canvas"></canvas>
+  <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby shooter game canvas"></canvas>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
@@ -131,59 +133,45 @@
     const scoreText = document.getElementById('scoreText');
     const livesText = document.getElementById('livesText');
 
-    const keys = {};
     const game = {
       started: false,
       over: false,
       score: 0,
       lives: 3,
+      targetScore: 12,
       lastTime: 0,
-      bananaGoal: 8,
-      invulnerable: 0,
-      player: {
-        x: 90,
-        y: 200,
-        r: 18,
-        speed: 4.2
-      },
-      bananas: [],
-      coconuts: []
+      spawnTimer: 0,
+      player: { x: 360, y: 350, r: 26, speed: 6 },
+      enemies: [],
+      bullets: [],
+      particles: []
     };
+
+    const keys = {};
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
     }
 
-    function distance(a, b) {
-      return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-
-    function spawnBanana() {
-      const banana = {
-        x: 60 + Math.random() * (canvas.width - 120),
-        y: 60 + Math.random() * (canvas.height - 120),
-        r: 12
+    function getPointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY
       };
-      for (let i = 0; i < game.coconuts.length; i++) {
-        if (distance(banana, game.coconuts[i]) < banana.r + game.coconuts[i].r + 20) {
-          return spawnBanana();
-        }
-      }
-      game.bananas.push(banana);
     }
 
-    function spawnCoconut() {
-      const coconut = {
-        x: 60 + Math.random() * (canvas.width - 120),
-        y: 60 + Math.random() * (canvas.height - 120),
-        r: 20,
+    function makeEnemy() {
+      return {
+        x: 50 + Math.random() * (canvas.width - 100),
+        y: -30,
+        r: 18 + Math.random() * 14,
+        speed: 1.1 + Math.random() * 1.6,
         drift: Math.random() * Math.PI * 2,
-        speed: 0.8 + Math.random() * 1.5
+        phase: Math.random() * 100
       };
-      if (distance(coconut, game.player) < 80) {
-        return spawnCoconut();
-      }
-      game.coconuts.push(coconut);
     }
 
     function resetGame() {
@@ -191,32 +179,60 @@
       game.over = false;
       game.score = 0;
       game.lives = 3;
-      game.invulnerable = 0;
-      game.player.x = 90;
-      game.player.y = 200;
-      game.bananas = [];
-      game.coconuts = [];
+      game.spawnTimer = 0;
+      game.enemies = [];
+      game.bullets = [];
+      game.particles = [];
+      game.player.x = canvas.width / 2;
+      game.player.y = canvas.height - 50;
 
-      for (let i = 0; i < 8; i++) {
-        spawnBanana();
-      }
-      for (let i = 0; i < 4; i++) {
-        spawnCoconut();
-      }
-
-      scoreText.textContent = `Bananas: ${game.score}`;
-      livesText.textContent = `Lives: ${game.lives}`;
-      messageEl.textContent = 'Collect bananas and dodge the coconuts!';
+      scoreText.textContent = 'Score: 0';
+      livesText.textContent = 'Lives: 3';
+      messageEl.textContent = 'Tap the bad guys and blast them with banana shots!';
       startButton.textContent = 'PLAY AGAIN';
       hud.style.display = 'flex';
       canvas.style.display = 'block';
     }
 
-    function startGame() {
-      resetGame();
+    function shootBanana(targetX, targetY) {
+      if (!game.started || game.over) return;
+      game.bullets.push({
+        x: game.player.x,
+        y: game.player.y - 12,
+        targetX,
+        targetY,
+        speed: 10,
+        radius: 7,
+        trail: []
+      });
     }
 
-    function handleInput() {
+    function hitEnemy(enemyIndex) {
+      const enemy = game.enemies[enemyIndex];
+      for (let i = 0; i < 16; i++) {
+        game.particles.push({
+          x: enemy.x,
+          y: enemy.y,
+          vx: (Math.random() - 0.5) * 3.5,
+          vy: (Math.random() - 0.5) * 3.5,
+          life: 22 + Math.random() * 16,
+          color: '#dca739'
+        });
+      }
+      game.enemies.splice(enemyIndex, 1);
+      game.score += 1;
+      scoreText.textContent = 'Score: ' + game.score;
+
+      if (game.score >= game.targetScore) {
+        game.over = true;
+        messageEl.textContent = 'Coconut Island is safe! Banana Baby wins!';
+        startButton.textContent = 'PLAY AGAIN';
+      } else {
+        messageEl.textContent = 'Direct hit! Keep blasting the enemies!';
+      }
+    }
+
+    function handleMovement() {
       let dx = 0;
       let dy = 0;
 
@@ -225,202 +241,241 @@
       if (keys['arrowdown'] || keys['s']) dy += 1;
       if (keys['arrowup'] || keys['w']) dy -= 1;
 
-      const magnitude = Math.hypot(dx, dy) || 1;
-      game.player.x += (dx / magnitude) * game.player.speed;
-      game.player.y += (dy / magnitude) * game.player.speed;
+      if (dx !== 0 || dy !== 0) {
+        const length = Math.hypot(dx, dy) || 1;
+        game.player.x += (dx / length) * game.player.speed;
+        game.player.y += (dy / length) * game.player.speed;
+      }
 
-      game.player.x = clamp(game.player.x, game.player.r, canvas.width - game.player.r);
-      game.player.y = clamp(game.player.y, game.player.r, canvas.height - game.player.r);
+      game.player.x = clamp(game.player.x, 52, canvas.width - 52);
+      game.player.y = clamp(game.player.y, 42, canvas.height - 42);
     }
 
-    function updateCoconuts() {
-      for (let i = 0; i < game.coconuts.length; i++) {
-        const coconut = game.coconuts[i];
-        coconut.drift += 0.03;
-        coconut.x += Math.cos(coconut.drift) * coconut.speed;
-        coconut.y += Math.sin(coconut.drift * 1.8) * coconut.speed;
+    function updateBullets() {
+      for (let i = game.bullets.length - 1; i >= 0; i--) {
+        const bullet = game.bullets[i];
+        bullet.trail.push({ x: bullet.x, y: bullet.y });
+        if (bullet.trail.length > 8) bullet.trail.shift();
 
-        if (coconut.x < coconut.r || coconut.x > canvas.width - coconut.r) {
-          coconut.x = clamp(coconut.x, coconut.r, canvas.width - coconut.r);
-          coconut.drift += Math.PI * 0.8;
-        }
-        if (coconut.y < coconut.r || coconut.y > canvas.height - coconut.r) {
-          coconut.y = clamp(coconut.y, coconut.r, canvas.height - coconut.r);
-          coconut.drift += Math.PI * 0.8;
-        }
+        const dx = bullet.targetX - bullet.x;
+        const dy = bullet.targetY - bullet.y;
+        const dist = Math.hypot(dx, dy) || 1;
 
-        if (distance(game.player, coconut) < game.player.r + coconut.r) {
-          if (game.invulnerable <= 0) {
-            game.lives -= 1;
-            game.invulnerable = 90;
-            messageEl.textContent = `Ouch! ${game.lives} lives left.`;
-            if (game.lives <= 0) {
-              game.over = true;
-              messageEl.textContent = 'Game over! Press PLAY AGAIN to save Coconut Island.';
-              startButton.textContent = 'PLAY AGAIN';
+        if (dist <= bullet.speed + 1) {
+          for (let j = 0; j < game.enemies.length; j++) {
+            const enemy = game.enemies[j];
+            if (Math.hypot(enemy.x - bullet.targetX, enemy.y - bullet.targetY) <= enemy.r + 8) {
+              hitEnemy(j);
+              game.bullets.splice(i, 1);
+              return;
             }
+          }
+        }
+
+        bullet.x += (dx / dist) * bullet.speed;
+        bullet.y += (dy / dist) * bullet.speed;
+
+        if (bullet.x < -10 || bullet.x > canvas.width + 10 || bullet.y < -10 || bullet.y > canvas.height + 10) {
+          game.bullets.splice(i, 1);
+        }
+      }
+    }
+
+    function updateEnemies() {
+      game.spawnTimer += 1;
+      if (game.spawnTimer > 50) {
+        game.spawnTimer = 0;
+        if (game.enemies.length < 10) {
+          game.enemies.push(makeEnemy());
+        }
+      }
+
+      for (let i = game.enemies.length - 1; i >= 0; i--) {
+        const enemy = game.enemies[i];
+        enemy.y += enemy.speed;
+        enemy.x += Math.sin((enemy.y + enemy.phase) * 0.08) * 1.7;
+
+        if (enemy.y > canvas.height - 18) {
+          game.enemies.splice(i, 1);
+          game.lives -= 1;
+          livesText.textContent = 'Lives: ' + game.lives;
+          messageEl.textContent = 'An enemy slipped through! Watch out!';
+
+          if (game.lives <= 0) {
+            game.over = true;
+            messageEl.textContent = 'Banana Baby got overwhelmed. Press PLAY AGAIN!';
+            startButton.textContent = 'PLAY AGAIN';
           }
         }
       }
     }
 
-    function updateBananas() {
-      for (let i = game.bananas.length - 1; i >= 0; i--) {
-        const banana = game.bananas[i];
-        if (distance(game.player, banana) < game.player.r + banana.r) {
-          game.bananas.splice(i, 1);
-          game.score += 1;
-          messageEl.textContent = `Nice! ${game.score}/${game.bananaGoal} bananas collected.`;
-          scoreText.textContent = `Bananas: ${game.score}`;
-
-          if (game.score >= game.bananaGoal) {
-            game.over = true;
-            messageEl.textContent = 'You saved Coconut Island! Press PLAY AGAIN for another round.';
-            startButton.textContent = 'PLAY AGAIN';
-          } else {
-            spawnBanana();
-          }
+    function updateParticles() {
+      for (let i = game.particles.length - 1; i >= 0; i--) {
+        const p = game.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+        if (p.life <= 0) {
+          game.particles.splice(i, 1);
         }
       }
     }
 
     function drawBackground() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = '#c7ecff';
+      ctx.fillStyle = '#bfe9ff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = '#7ad57c';
-      ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
+      ctx.fillStyle = '#7ecf72';
+      ctx.fillRect(0, canvas.height * 0.72, canvas.width, canvas.height * 0.28);
 
-      ctx.fillStyle = '#78b65f';
-      for (let i = 0; i < 12; i++) {
-        const x = (i * 70) % canvas.width;
-        const y = canvas.height * 0.72 + (i % 3) * 12;
-        ctx.fillRect(x, y, 20, 32);
+      for (let i = 0; i < 14; i++) {
+        const x = (i * 60) % canvas.width;
+        const y = canvas.height * 0.74 + (i % 3) * 12;
+        ctx.fillStyle = '#6bbf59';
+        ctx.fillRect(x, y, 22, 30);
       }
     }
 
     function drawPlayer() {
       const { x, y, r } = game.player;
 
-      if (game.invulnerable > 0 && Math.floor(game.invulnerable / 8) % 2 === 0) {
-        return;
-      }
-
-      ctx.fillStyle = '#f5c76b';
+      ctx.fillStyle = '#f6cf5d';
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.ellipse(x, y, r * 0.95, r * 1.05, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#6ab74a';
+      ctx.fillStyle = '#d4a126';
       ctx.beginPath();
-      ctx.moveTo(x + 12, y - 8);
-      ctx.lineTo(x + 24, y - 3);
-      ctx.lineTo(x + 14, y + 7);
+      ctx.moveTo(x - 12, y - 10);
+      ctx.lineTo(x + 12, y - 18);
+      ctx.lineTo(x + 10, y - 4);
+      ctx.lineTo(x - 10, y - 2);
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = '#333';
+      ctx.fillStyle = '#222';
       ctx.beginPath();
-      ctx.arc(x - 5, y - 3, 2.2, 0, Math.PI * 2);
-      ctx.arc(x + 5, y - 3, 2.2, 0, Math.PI * 2);
+      ctx.arc(x - 7, y - 4, 2.4, 0, Math.PI * 2);
+      ctx.arc(x + 7, y - 4, 2.4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(x, y + 5, 5, 0, Math.PI);
-      ctx.strokeStyle = '#333';
+      ctx.strokeStyle = '#222';
       ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    function drawBanana(banana) {
-      ctx.fillStyle = '#f4ca45';
       ctx.beginPath();
-      ctx.ellipse(banana.x, banana.y, banana.r + 5, banana.r, 0, 0, Math.PI * 2);
+      ctx.arc(x, y + 6, 6, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e8a33d';
+      ctx.beginPath();
+      ctx.arc(x + 14, y - 4, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = '#c28a1c';
-      ctx.lineWidth = 3;
+      ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.moveTo(banana.x - 10, banana.y);
-      ctx.lineTo(banana.x + 10, banana.y);
-      ctx.stroke();
-
-      ctx.fillStyle = '#6bbf59';
-      ctx.beginPath();
-      ctx.moveTo(banana.x, banana.y - banana.r - 4);
-      ctx.lineTo(banana.x + 5, banana.y - banana.r - 12);
-      ctx.lineTo(banana.x + 2, banana.y - banana.r - 5);
-      ctx.closePath();
+      ctx.arc(x + 16, y - 5, 3, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function drawCoconut(coconut) {
-      ctx.fillStyle = '#8d5d3a';
+    function drawEnemy(enemy) {
+      ctx.fillStyle = '#7c563f';
       ctx.beginPath();
-      ctx.arc(coconut.x, coconut.y, coconut.r, 0, Math.PI * 2);
+      ctx.arc(enemy.x, enemy.y, enemy.r, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#5a341f';
+      ctx.fillStyle = '#2b1e1a';
       ctx.beginPath();
-      ctx.arc(coconut.x, coconut.y + 2, coconut.r * 0.65, 0, Math.PI * 2);
+      ctx.arc(enemy.x - 5, enemy.y - 4, 2.4, 0, Math.PI * 2);
+      ctx.arc(enemy.x + 5, enemy.y - 4, 2.4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#4d2d19';
+      ctx.strokeStyle = '#2b1e1a';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(coconut.x - 4, coconut.y - coconut.r + 4);
-      ctx.lineTo(coconut.x + 4, coconut.y - coconut.r + 4);
-      ctx.lineTo(coconut.x + 2, coconut.y - coconut.r + 12);
-      ctx.lineTo(coconut.x - 2, coconut.y - coconut.r + 12);
-      ctx.closePath();
+      ctx.arc(enemy.x, enemy.y + 5, 6, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+
+    function drawBullet(bullet) {
+      bullet.trail.forEach((point, index) => {
+        ctx.fillStyle = 'rgba(255, 200, 70, ' + (0.2 + index / bullet.trail.length) + ')';
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = '#f4d35e';
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    function drawParticles() {
+      for (const p of game.particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life / 35);
+        ctx.fillRect(p.x, p.y, 4, 4);
+        ctx.globalAlpha = 1;
+      }
     }
 
     function draw() {
       drawBackground();
-
-      for (let i = 0; i < game.bananas.length; i++) {
-        drawBanana(game.bananas[i]);
-      }
-
-      for (let i = 0; i < game.coconuts.length; i++) {
-        drawCoconut(game.coconuts[i]);
-      }
-
+      for (const enemy of game.enemies) drawEnemy(enemy);
+      for (const bullet of game.bullets) drawBullet(bullet);
+      drawParticles();
       drawPlayer();
     }
 
     function gameLoop(timestamp) {
-      const delta = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.8);
+      if (game.lastTime === 0) game.lastTime = timestamp;
+      const delta = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.6);
       game.lastTime = timestamp;
 
       if (game.started && !game.over) {
-        handleInput();
-        updateCoconuts();
-        updateBananas();
-        if (game.invulnerable > 0) game.invulnerable -= delta;
+        handleMovement();
+        updateEnemies();
+        updateBullets();
+        updateParticles();
       }
 
       draw();
       requestAnimationFrame(gameLoop);
     }
 
-    startButton.addEventListener('click', startGame);
+    function onCanvasClick(event) {
+      if (!game.started || game.over) return;
+      const pointer = getPointerPosition(event);
+      let targetHit = false;
+
+      for (let i = 0; i < game.enemies.length; i++) {
+        const enemy = game.enemies[i];
+        if (Math.hypot(pointer.x - enemy.x, pointer.y - enemy.y) <= enemy.r + 10) {
+          targetHit = true;
+          shootBanana(enemy.x, enemy.y);
+          break;
+        }
+      }
+
+      if (!targetHit) {
+        shootBanana(pointer.x, pointer.y);
+      }
+    }
+
+    startButton.addEventListener('click', resetGame);
+    canvas.addEventListener('click', onCanvasClick);
+
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
       keys[key] = true;
-      keys[event.key] = true;
-
-      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(event.key.toLowerCase())) {
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
         event.preventDefault();
       }
     });
 
     window.addEventListener('keyup', (event) => {
-      const key = event.key.toLowerCase();
-      keys[key] = false;
-      keys[event.key] = false;
+      keys[event.key.toLowerCase()] = false;
     });
 
     requestAnimationFrame(gameLoop);
