@@ -12,18 +12,24 @@
       --grass: #6bbd63;
       --text: #3b2a1d;
       --panel: rgba(255,255,255,0.7);
+      --danger: #d64545;
     }
 
     * { box-sizing: border-box; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 820px;
-      margin: 50px auto;
-      padding: 0 20px 40px;
-      text-align: center;
+    html, body {
+      margin: 0;
+      padding: 0;
       background: var(--sky);
       color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      max-width: 820px;
+      margin: 50px auto 30px;
+      padding: 0 20px 40px;
+      text-align: center;
     }
 
     h1 {
@@ -104,6 +110,56 @@
       margin: 18px auto 0;
       cursor: crosshair;
     }
+
+    .touch-controls {
+      display: none;
+      max-width: 720px;
+      margin: 16px auto 0;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .touch-controls.visible {
+      display: flex;
+    }
+
+    .touch-controls .pad {
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(3, 52px);
+      gap: 6px;
+      padding: 8px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.55);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .touch-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      border: none;
+      font-weight: 800;
+      font-size: 1.1rem;
+      background: rgba(245,199,107,0.9);
+      color: #583d1b;
+      box-shadow: inset 0 -3px 0 rgba(0,0,0,0.08);
+      user-select: none;
+      touch-action: none;
+    }
+
+    .touch-btn:active,
+    .touch-btn.active {
+      transform: scale(0.96);
+      background: rgba(222,154,45,0.95);
+      color: white;
+    }
+
+    @media (max-width: 680px) {
+      body { margin-top: 20px; }
+      .touch-controls { display: flex; }
+    }
   </style>
 </head>
 <body>
@@ -118,7 +174,19 @@
 
   <div id="hud">
     <span id="scoreText">Score: 0</span>
+    <span id="comboText">Combo: x1</span>
     <span id="livesText">Lives: 3</span>
+  </div>
+
+  <div id="touchControls" class="touch-controls" aria-label="Touch controls">
+    <div class="pad">
+      <div></div>
+      <button class="touch-btn" data-key="arrowup" aria-label="Move up">▲</button>
+      <div></div>
+      <button class="touch-btn" data-key="arrowleft" aria-label="Move left">◀</button>
+      <button class="touch-btn" data-key="arrowdown" aria-label="Move down">▼</button>
+      <button class="touch-btn" data-key="arrowright" aria-label="Move right">▶</button>
+    </div>
   </div>
 
   <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby pseudo-3D shooter game"></canvas>
@@ -130,7 +198,9 @@
     const startButton = document.getElementById('startButton');
     const hud = document.getElementById('hud');
     const scoreText = document.getElementById('scoreText');
+    const comboText = document.getElementById('comboText');
     const livesText = document.getElementById('livesText');
+    const touchControls = document.getElementById('touchControls');
 
     const playerImage = new Image();
     playerImage.src = 'banana_baby.png';
@@ -141,6 +211,8 @@
       over: false,
       score: 0,
       lives: 3,
+      combo: 1,
+      comboTimer: 0,
       targetScore: 18,
       lastTime: 0,
       spawnTimer: 0,
@@ -148,18 +220,36 @@
       enemies: [],
       bullets: [],
       particles: [],
-      clouds: []
+      clouds: [],
+      boss: null,
+      bossSpawned: false,
+      bossHealth: 0
     };
 
     function rand(min, max) { return min + Math.random() * (max - min); }
     function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+
+    function setCombo(multiplier) {
+      game.combo = multiplier;
+      comboText.textContent = 'Combo: x' + game.combo;
+      game.comboTimer = 120;
+    }
+
+    function updateCombo() {
+      if (game.comboTimer > 0) {
+        game.comboTimer -= 1;
+      } else if (game.combo > 1) {
+        game.combo = 1;
+        comboText.textContent = 'Combo: x1';
+      }
+    }
 
     function initClouds() {
       game.clouds = [];
       for (let i = 0; i < 8; i++) {
         game.clouds.push({
           x: rand(0, canvas.width),
-          y: rand(30, 150),
+          y: rand(30, 160),
           r: rand(22, 42),
           speed: rand(0.2, 0.8),
           alpha: rand(0.2, 0.45)
@@ -187,7 +277,22 @@
         phase: Math.random() * 100,
         bag: Math.random() > 0.5,
         z: rand(0.7, 1.8),
-        tilt: rand(-0.5, 0.5)
+        tilt: rand(-0.5, 0.5),
+        boss: false
+      };
+    }
+
+    function makeBoss() {
+      return {
+        x: canvas.width / 2,
+        y: -40,
+        r: 42,
+        speed: 1.1,
+        health: 8,
+        boss: true,
+        phase: 0,
+        tilt: 0,
+        z: 1.4
       };
     }
 
@@ -196,20 +301,27 @@
       game.over = false;
       game.score = 0;
       game.lives = 3;
+      game.combo = 1;
+      game.comboTimer = 0;
       game.spawnTimer = 0;
       game.enemies = [];
       game.bullets = [];
       game.particles = [];
       game.player.x = canvas.width / 2;
       game.player.y = canvas.height - 50;
+      game.boss = null;
+      game.bossSpawned = false;
+      game.bossHealth = 0;
       initClouds();
 
       scoreText.textContent = 'Score: 0';
+      comboText.textContent = 'Combo: x1';
       livesText.textContent = 'Lives: 3';
       messageEl.textContent = 'Tap the Fruit Fly Guys and blast them with banana shots!';
       startButton.textContent = 'PLAY AGAIN';
       hud.style.display = 'flex';
       canvas.style.display = 'block';
+      touchControls.classList.add('visible');
     }
 
     function shootBanana(targetX, targetY) {
@@ -225,8 +337,8 @@
       });
     }
 
-    function hitEnemy(enemyIndex) {
-      const enemy = game.enemies[enemyIndex];
+    function killEnemy(index, isBoss = false) {
+      const enemy = game.enemies[index];
       for (let i = 0; i < 18; i++) {
         game.particles.push({
           x: enemy.x,
@@ -234,20 +346,47 @@
           vx: (Math.random() - 0.5) * 4,
           vy: (Math.random() - 0.5) * 4,
           life: 20 + Math.random() * 18,
-          color: '#dca739'
+          color: isBoss ? '#f3c76d' : '#dca739'
         });
       }
-      game.enemies.splice(enemyIndex, 1);
-      game.score += 1;
-      scoreText.textContent = 'Score: ' + game.score;
+      game.enemies.splice(index, 1);
 
-      if (game.score >= game.targetScore) {
-        game.over = true;
-        messageEl.textContent = 'You saved Coconut Island! Banana Baby wins!';
-        startButton.textContent = 'PLAY AGAIN';
+      if (isBoss) {
+        game.score += 8 * game.combo;
+        game.boss = null;
+        game.bossSpawned = false;
+        messageEl.textContent = 'Boss down! Coconut Island is turning in your favor!';
       } else {
-        messageEl.textContent = 'Direct hit! The Fruit Fly Guy was defeated!';
+        game.score += 1 * game.combo;
       }
+
+      scoreText.textContent = 'Score: ' + game.score;
+      if (game.combo < 6) setCombo(Math.min(game.combo + 1, 6));
+    }
+
+    function checkBossSpawn() {
+      if (game.boss || game.score < 8 || game.bossSpawned) return;
+      game.bossSpawned = true;
+      game.boss = makeBoss();
+      game.enemies.push(game.boss);
+      messageEl.textContent = 'Boss fight! The Fruit Fly King is here!';
+    }
+
+    function hitEnemy(enemyIndex) {
+      const enemy = game.enemies[enemyIndex];
+      if (!enemy) return;
+
+      if (enemy.boss) {
+        enemy.health -= 1;
+        if (enemy.health <= 0) {
+          killEnemy(enemyIndex, true);
+        } else {
+          messageEl.textContent = 'Boss hit! Keep hitting it!';
+        }
+        return;
+      }
+
+      killEnemy(enemyIndex, false);
     }
 
     function handleMovement() {
@@ -300,15 +439,35 @@
 
     function updateEnemies() {
       game.spawnTimer += 1;
-      if (game.spawnTimer > 44) {
+      if (!game.boss && game.spawnTimer > 42) {
         game.spawnTimer = 0;
-        if (game.enemies.length < 10) {
+        if (game.enemies.filter(e => !e.boss).length < 10) {
           game.enemies.push(makeEnemy());
         }
       }
 
       for (let i = game.enemies.length - 1; i >= 0; i--) {
         const enemy = game.enemies[i];
+        if (enemy.boss) {
+          enemy.phase += 0.08;
+          enemy.x += Math.sin(enemy.phase) * 2.2;
+          enemy.y = Math.min(enemy.y + 0.6, 100);
+          enemy.tilt = Math.sin(enemy.phase) * 0.5;
+
+          if (enemy.x < 50 || enemy.x > canvas.width - 50) {
+            enemy.x = clamp(enemy.x, 50, canvas.width - 50);
+          }
+
+          if (enemy.y > 110) {
+            enemy.y = 110;
+          }
+
+          if (enemy.health <= 0) {
+            hitEnemy(i);
+          }
+          continue;
+        }
+
         enemy.y += enemy.speed * 1.2;
         enemy.x += Math.sin((enemy.y + enemy.phase) * 0.15) * (2.2 * enemy.z);
 
@@ -424,14 +583,90 @@
       ctx.restore();
     }
 
+    function drawBoss(enemy) {
+      ctx.save();
+      ctx.translate(enemy.x, enemy.y);
+      ctx.rotate(enemy.tilt);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(0, enemy.r + 18, enemy.r * 1.6, enemy.r * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#7f7f7f';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 42, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#5e5e5e';
+      ctx.beginPath();
+      ctx.arc(0, -30, 32, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#f6d3d3';
+      ctx.beginPath();
+      ctx.arc(-12, -32, 7, 0, Math.PI * 2);
+      ctx.arc(12, -32, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#d64545';
+      ctx.beginPath();
+      ctx.arc(-12, -32, 3.5, 0, Math.PI * 2);
+      ctx.arc(12, -32, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#9a6b2b';
+      ctx.fillRect(18, 6, 14, 16);
+
+      ctx.strokeStyle = '#3a3a3a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-24, 0); ctx.lineTo(-40, 26);
+      ctx.moveTo(24, 0); ctx.lineTo(40, 26);
+      ctx.moveTo(-18, 18); ctx.lineTo(-18, 34);
+      ctx.moveTo(18, 18); ctx.lineTo(18, 34);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e6d3a4';
+      ctx.fillRect(-12, 28, 24, 6);
+
+      ctx.fillStyle = '#2f2f2f';
+      ctx.fillRect(-5, 34, 10, 7);
+
+      ctx.fillStyle = '#e9e9e9';
+      ctx.fillRect(-32, 10, 18, 8);
+      ctx.fillRect(14, 10, 18, 8);
+
+      ctx.fillStyle = '#d9d9d9';
+      ctx.fillRect(-30, 12, 14, 4);
+      ctx.fillRect(16, 12, 14, 4);
+
+      ctx.fillStyle = '#d9d9d9';
+      ctx.fillRect(-42, -10, 12, 5);
+      ctx.fillRect(30, -10, 12, 5);
+
+      ctx.fillStyle = '#c2a15a';
+      ctx.fillRect(-10, -45, 20, 8);
+
+      ctx.fillStyle = '#6d6d6d';
+      ctx.fillRect(-52, -8, 12, 6);
+      ctx.fillRect(40, -8, 12, 6);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('BOSS', -18, 52);
+      ctx.restore();
+    }
+
     function drawEnemy(enemy) {
-      const scale = 0.85 + (enemy.z * 0.3);
-      const x = enemy.x;
-      const y = enemy.y;
+      if (enemy.boss) {
+        drawBoss(enemy);
+        return;
+      }
 
       ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(scale, scale);
+      ctx.translate(enemy.x, enemy.y);
+      ctx.scale(1, 1 + (enemy.z - 1) * 0.3);
       ctx.rotate(enemy.tilt);
 
       ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -521,6 +756,8 @@
       if (game.started && !game.over) {
         handleMovement();
         updateClouds();
+        updateCombo();
+        checkBossSpawn();
         updateEnemies();
         updateBullets();
         updateParticles();
@@ -547,8 +784,31 @@
       if (!targetHit) shootBanana(pointer.x, pointer.y);
     }
 
+    function bindTouchButton(button) {
+      const key = button.dataset.key;
+      const setPressed = (pressed) => {
+        if (pressed) {
+          keys[key] = true;
+          button.classList.add('active');
+        } else {
+          keys[key] = false;
+          button.classList.remove('active');
+        }
+      };
+
+      button.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        setPressed(true);
+      });
+      button.addEventListener('pointerup', () => setPressed(false));
+      button.addEventListener('pointerleave', () => setPressed(false));
+      button.addEventListener('pointercancel', () => setPressed(false));
+    }
+
     startButton.addEventListener('click', resetGame);
     canvas.addEventListener('click', onCanvasClick);
+
+    document.querySelectorAll('.touch-btn').forEach(bindTouchButton);
 
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
