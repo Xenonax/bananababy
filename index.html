@@ -550,7 +550,7 @@
 
     function checkBossSpawn() {
       if (game.over || game.boss || game.bossDefeated) return;
-      if (game.score < 12 + game.bossesDefeated * 12) return;
+      if (game.score < 6 + game.bossesDefeated * 8) return;
       if (game.bossesDefeated >= game.bossGoal) return;
       if (game.bossSpawned) return;
 
@@ -998,153 +998,128 @@
       ctx.strokeStyle = '#3a3a3a';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-12, 3); ctx.lineTo(-22, 18);
-      ctx.moveTo(12, 3); ctx.lineTo(22, 18);
-      ctx.moveTo(-8, 16); ctx.lineTo(-12, 26);
-      ctx.moveTo(8, 16); ctx.lineTo(12, 26);
+      ctx.moveTo(-14, 16); ctx.lineTo(-28, 27);
+      ctx.moveTo(14, 16); ctx.lineTo(28, 27);
+      ctx.moveTo(-8, 22); ctx.lineTo(-4, 34);
+      ctx.moveTo(8, 22); ctx.lineTo(4, 34);
       ctx.stroke();
 
-      if (enemy.bag) {
-        ctx.fillStyle = '#a78d67';
-        ctx.fillRect(12, 2, 10, 12);
-        ctx.fillStyle = '#ffe5b2';
-        ctx.fillRect(13, 4, 8, 8);
-      }
-
-      ctx.fillStyle = '#2c2c2c';
-      ctx.fillRect(-4, 22, 8, 4);
+      ctx.fillStyle = '#a1a1a1';
+      ctx.fillRect(-8, 0, 16, 10);
       ctx.restore();
     }
 
-    function drawEnemyShot(shot) {
-      ctx.fillStyle = shot.color;
-      ctx.beginPath();
-      ctx.arc(shot.x, shot.y, shot.radius, 0, Math.PI * 2);
-      ctx.fill();
+    function drawBullets() {
+      for (const bullet of game.bullets) {
+        for (let i = 0; i < bullet.trail.length; i++) {
+          const t = bullet.trail[i];
+          ctx.fillStyle = `rgba(169, 121, 42, ${i / bullet.trail.length})`;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = '#f3c76d';
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    function drawBullet(bullet) {
-      bullet.trail.forEach((point, index) => {
-        ctx.fillStyle = 'rgba(255, 200, 70, ' + (0.2 + index / bullet.trail.length) + ')';
+    function drawEnemyShots() {
+      for (const shot of game.enemyShots) {
+        ctx.fillStyle = '#d64545';
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+        ctx.arc(shot.x, shot.y, shot.radius, 0, Math.PI * 2);
         ctx.fill();
-      });
-
-      ctx.fillStyle = '#f4d35e';
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
-      ctx.fill();
+      }
     }
 
     function drawParticles() {
       for (const p of game.particles) {
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, p.life / 35);
+        ctx.globalAlpha = Math.max(0, p.life / 30);
         ctx.fillRect(p.x, p.y, 4, 4);
-        ctx.globalAlpha = 1;
       }
+      ctx.globalAlpha = 1;
     }
 
     function drawBossExplosion() {
       for (const p of game.bossExplosion) {
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, p.life / 52);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = Math.max(0, p.life / 50);
+        ctx.fillRect(p.x, p.y, p.size, p.size);
       }
+      ctx.globalAlpha = 1;
     }
 
     function drawCutscene() {
       if (!game.cutscene) return;
-      ctx.fillStyle = 'rgba(20, 20, 20, 0.35)';
+      const alpha = clamp(1 - game.cutscene.timer / game.cutscene.duration, 0, 1);
+      ctx.fillStyle = `rgba(0,0,0,${0.35 * alpha})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
       ctx.font = 'bold 30px sans-serif';
-      ctx.fillText(game.cutscene.title, canvas.width / 2, canvas.height / 2 - 12);
-      ctx.font = '20px sans-serif';
-      ctx.fillText(game.cutscene.subtitle, canvas.width / 2, canvas.height / 2 + 26);
-      ctx.font = '16px sans-serif';
-      ctx.fillText(game.cutscene.footer, canvas.width / 2, canvas.height / 2 + 58);
+      ctx.textAlign = 'center';
+      ctx.fillText(game.cutscene.title, canvas.width / 2, canvas.height / 2 - 8);
+      ctx.font = '18px sans-serif';
+      ctx.fillText(game.cutscene.subtitle, canvas.width / 2, canvas.height / 2 + 28);
+      ctx.font = '14px sans-serif';
+      ctx.fillText(game.cutscene.footer, canvas.width / 2, canvas.height / 2 + 56);
+      ctx.textAlign = 'start';
     }
 
     function draw() {
       drawBackground();
-      drawParticles();
       drawBossExplosion();
-      for (const bullet of game.bullets) drawBullet(bullet);
+      drawParticles();
+      drawBullets();
+      drawEnemyShots();
       for (const enemy of game.enemies) drawEnemy(enemy);
-      for (const shot of game.enemyShots) drawEnemyShot(shot);
       drawPlayer();
       drawBossBar();
       drawCutscene();
     }
 
-    function tick(timestamp) {
-      if (!game.started) {
-        draw();
-        requestAnimationFrame(tick);
-        return;
-      }
+    function update() {
+      if (!game.started || game.over) return;
+      updateCombo();
+      handleMovement();
+      updateClouds();
+      updateBullets();
+      updateEnemyShots();
+      updateEnemies();
+      checkBossSpawn();
+      updateParticles();
+      updateBossExplosion();
+      updateCutscene();
+      draw();
+    }
 
-      if (!game.over) {
-        const delta = timestamp - (game.lastTime || timestamp);
-        game.lastTime = timestamp;
-        if (delta > 0) {
-          updateCombo();
-          handleMovement();
-          updateBullets();
-          updateEnemyShots();
-          updateEnemies();
-          updateParticles();
-          updateBossExplosion();
-          updateClouds();
-          updateCutscene();
-          checkBossSpawn();
-          draw();
-        }
-      } else {
-        draw();
-      }
-      requestAnimationFrame(tick);
+    function startGame() {
+      resetGame();
+      requestAnimationFrame(loop);
+    }
+
+    function loop() {
+      update();
+      requestAnimationFrame(loop);
     }
 
     startButton.addEventListener('click', () => {
-      resetGame();
-    });
-
-    canvas.addEventListener('pointerdown', (event) => {
-      const point = getPointerPosition(event);
-      game.pointerTarget = point;
-      game.dragging = true;
-      game.ignoreNextClick = true;
-      shootBanana(point.x, point.y);
-    });
-
-    canvas.addEventListener('pointermove', (event) => {
-      if (!game.dragging) return;
-      game.pointerTarget = getPointerPosition(event);
-    });
-
-    canvas.addEventListener('pointerup', () => {
-      game.dragging = false;
-      game.pointerTarget = null;
-    });
-
-    canvas.addEventListener('pointerleave', () => {
-      game.dragging = false;
-      game.pointerTarget = null;
+      if (!game.started || game.over) {
+        startGame();
+      }
     });
 
     document.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
-      keys[key] = true;
-      if (event.key === ' ') {
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
         event.preventDefault();
-        shootBanana(game.player.x, game.player.y - 80);
+      }
+      keys[key] = true;
+      if (key === ' ') {
+        shootBanana(game.player.x, game.player.y - 100);
       }
     });
 
@@ -1152,9 +1127,33 @@
       keys[event.key.toLowerCase()] = false;
     });
 
+    canvas.addEventListener('pointerdown', (event) => {
+      const pos = getPointerPosition(event);
+      game.pointerTarget = pos;
+      game.dragging = true;
+      game.ignoreNextClick = true;
+      shootBanana(pos.x, pos.y);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (game.dragging) {
+        game.pointerTarget = getPointerPosition(event);
+      }
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      game.dragging = false;
+      game.pointerTarget = null;
+      game.ignoreNextClick = false;
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      game.dragging = false;
+      game.pointerTarget = null;
+    });
+
     initClouds();
     draw();
-    requestAnimationFrame(tick);
   </script>
 </body>
 </html>
