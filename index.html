@@ -177,7 +177,7 @@
   <div id="hud">
     <span id="scoreText">Score: 0</span>
     <span id="comboText">Combo: x1</span>
-    <span id="livesText">Lives: 3</span>
+    <span id="livesText">Lives: 5</span>
   </div>
 
   <div id="touchControls" class="touch-controls" aria-label="Touch controls">
@@ -273,7 +273,7 @@
       started: false,
       over: false,
       score: 0,
-      lives: 3,
+      lives: 5,
       combo: 1,
       comboTimer: 0,
       targetScore: 18,
@@ -400,7 +400,7 @@
       game.started = true;
       game.over = false;
       game.score = 0;
-      game.lives = 3;
+      game.lives = 5;
       game.combo = 1;
       game.comboTimer = 0;
       game.spawnTimer = 0;
@@ -425,7 +425,7 @@
 
       scoreText.textContent = 'Score: 0';
       comboText.textContent = 'Combo: x1';
-      livesText.textContent = 'Lives: 3';
+      livesText.textContent = 'Lives: 5';
       messageEl.textContent = 'Tap the Fruit Fly Guys and blast them with banana shots!';
       startButton.textContent = 'PLAY AGAIN';
       hud.style.display = 'flex';
@@ -1003,158 +1003,105 @@
 
     function drawCutscene() {
       if (!game.cutscene) return;
-      const alpha = Math.min(0.82, game.cutscene.timer / 48);
-      ctx.fillStyle = `rgba(8, 12, 20, ${alpha})`;
+      ctx.fillStyle = 'rgba(20, 20, 20, 0.35)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.96)';
-      ctx.font = 'bold 28px sans-serif';
+      ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
-      ctx.fillText(game.cutscene.title, canvas.width / 2, canvas.height / 2 - 32);
-
-      ctx.font = '18px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.82)';
-      ctx.fillText(game.cutscene.subtitle, canvas.width / 2, canvas.height / 2 + 6);
-
-      ctx.font = '14px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText(game.cutscene.footer, canvas.width / 2, canvas.height / 2 + 38);
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText(game.cutscene.title, canvas.width / 2, canvas.height / 2 - 12);
+      ctx.font = '20px sans-serif';
+      ctx.fillText(game.cutscene.subtitle, canvas.width / 2, canvas.height / 2 + 26);
+      ctx.font = '16px sans-serif';
+      ctx.fillText(game.cutscene.footer, canvas.width / 2, canvas.height / 2 + 58);
     }
 
     function draw() {
       drawBackground();
-      for (const enemy of game.enemies) drawEnemy(enemy);
-      for (const bullet of game.bullets) drawBullet(bullet);
-      for (const shot of game.enemyShots) drawEnemyShot(shot);
       drawParticles();
       drawBossExplosion();
+      for (const bullet of game.bullets) drawBullet(bullet);
+      for (const enemy of game.enemies) drawEnemy(enemy);
+      for (const shot of game.enemyShots) drawEnemyShot(shot);
       drawPlayer();
       drawBossBar();
       drawCutscene();
     }
 
-    function gameLoop(timestamp) {
-      if (game.lastTime === 0) game.lastTime = timestamp;
-      const dt = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.6);
-      game.lastTime = timestamp;
-
-      if (game.started && !game.over) {
-        handleMovement();
-        updateClouds();
-        updateCombo();
-        checkBossSpawn();
-        updateEnemies();
-        updateBullets();
-        updateEnemyShots();
-        updateParticles();
-      }
-
-      if (game.cutscene) {
-        updateCutscene();
-      }
-      updateBossExplosion();
-      draw();
-      requestAnimationFrame(gameLoop);
-    }
-
-    function onCanvasClick(event) {
-      if (!game.started || game.over) return;
-      if (game.ignoreNextClick) {
-        game.ignoreNextClick = false;
+    function tick(timestamp) {
+      if (!game.started) {
+        draw();
+        requestAnimationFrame(tick);
         return;
       }
 
-      const pointer = getPointerPosition(event);
-      let targetHit = false;
-
-      for (let i = 0; i < game.enemies.length; i++) {
-        const enemy = game.enemies[i];
-        if (Math.hypot(pointer.x - enemy.x, pointer.y - enemy.y) <= enemy.r + 12) {
-          targetHit = true;
-          shootBanana(enemy.x, enemy.y);
-          break;
+      if (!game.over) {
+        const delta = timestamp - (game.lastTime || timestamp);
+        game.lastTime = timestamp;
+        if (delta > 0) {
+          updateCombo();
+          handleMovement();
+          updateBullets();
+          updateEnemyShots();
+          updateEnemies();
+          updateParticles();
+          updateBossExplosion();
+          updateClouds();
+          updateCutscene();
+          checkBossSpawn();
+          if (game.score >= 10 && !game.boss && !game.bossDefeated) {
+            checkBossSpawn();
+          }
+          draw();
         }
+      } else {
+        draw();
       }
-
-      if (!targetHit) shootBanana(pointer.x, pointer.y);
+      requestAnimationFrame(tick);
     }
 
-    function bindTouchButton(button) {
-      const key = button.dataset.key;
-      const setPressed = (pressed) => {
-        if (pressed) {
-          keys[key] = true;
-          button.classList.add('active');
-        } else {
-          keys[key] = false;
-          button.classList.remove('active');
-        }
-      };
-
-      button.addEventListener('pointerdown', (event) => {
-        event.preventDefault();
-        setPressed(true);
-      });
-      button.addEventListener('pointerup', () => setPressed(false));
-      button.addEventListener('pointerleave', () => setPressed(false));
-      button.addEventListener('pointercancel', () => setPressed(false));
-    }
+    startButton.addEventListener('click', () => {
+      resetGame();
+    });
 
     canvas.addEventListener('pointerdown', (event) => {
-      audio.init();
-      if (!game.started || game.over) return;
-      const pointer = getPointerPosition(event);
+      const point = getPointerPosition(event);
+      game.pointerTarget = point;
       game.dragging = true;
-      game.pointerTarget = pointer;
       game.ignoreNextClick = true;
-      game.autoFireCooldown = 0;
-      canvas.setPointerCapture?.(event.pointerId);
+      shootBanana(point.x, point.y);
     });
 
     canvas.addEventListener('pointermove', (event) => {
-      if (!game.dragging || !game.started || game.over) return;
-      const pointer = getPointerPosition(event);
-      const moved = Math.hypot(pointer.x - game.player.x, pointer.y - game.player.y) > 8;
-      if (moved) {
-        game.pointerTarget = pointer;
-        game.ignoreNextClick = true;
-      }
+      if (!game.dragging) return;
+      game.pointerTarget = getPointerPosition(event);
     });
 
     canvas.addEventListener('pointerup', () => {
       game.dragging = false;
       game.pointerTarget = null;
-      game.autoFireCooldown = 0;
     });
 
     canvas.addEventListener('pointerleave', () => {
-      if (game.dragging) {
-        game.dragging = false;
-        game.pointerTarget = null;
-        game.autoFireCooldown = 0;
+      game.dragging = false;
+      game.pointerTarget = null;
+    });
+
+    document.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      keys[key] = true;
+      if (event.key === ' ') {
+        event.preventDefault();
+        shootBanana(game.player.x, game.player.y - 80);
       }
     });
 
-    startButton.addEventListener('click', () => {
-      audio.init();
-      resetGame();
-    });
-    canvas.addEventListener('click', onCanvasClick);
-
-    document.querySelectorAll('.touch-btn').forEach(bindTouchButton);
-
-    window.addEventListener('keydown', (event) => {
-      const key = event.key.toLowerCase();
-      keys[key] = true;
-      if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) event.preventDefault();
-    });
-
-    window.addEventListener('keyup', (event) => {
+    document.addEventListener('keyup', (event) => {
       keys[event.key.toLowerCase()] = false;
     });
 
     initClouds();
-    requestAnimationFrame(gameLoop);
+    draw();
+    requestAnimationFrame(tick);
   </script>
 </body>
 </html>
