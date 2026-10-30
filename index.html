@@ -5,66 +5,425 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Banana Baby The Game</title>
   <style>
+    :root {
+      --banana: #f5c76b;
+      --banana-dark: #de9a2d;
+      --sky: #fffbe8;
+      --panel: #fffdf6;
+      --shadow: rgba(0, 0, 0, 0.12);
+      --coconut: #9a5d2d;
+      --grass: #6bbd63;
+      --text: #3b2a1d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 600px;
-      margin: 60px auto;
-      padding: 0 20px;
+      max-width: 820px;
+      margin: 50px auto;
+      padding: 0 20px 40px;
       text-align: center;
-      background: #fffbe8;
-      color: #333;
+      background: var(--sky);
+      color: var(--text);
     }
+
     h1 {
-      font-size: 2.5rem;
+      font-size: clamp(2.2rem, 4vw, 3rem);
       color: #e8a33d;
+      margin-bottom: 0.4rem;
     }
+
     p {
       font-size: 1.1rem;
+      margin: 0.5rem 0;
     }
+
     img {
       display: block;
       max-width: 240px;
       width: 100%;
       height: auto;
-      margin: 0 auto;
+      margin: 0 auto 24px;
     }
+
     .box {
       background: white;
-      border-radius: 12px;
-      padding: 20px;
-      margin-top: 30px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 16px;
+      padding: 20px 18px 18px;
+      margin-top: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
+
+    #message {
+      min-height: 26px;
+      font-weight: 600;
+    }
+
     button {
       font-size: 1rem;
-      padding: 10px 20px;
+      padding: 12px 22px;
       border: none;
-      border-radius: 8px;
-      background: #e8a33d;
+      border-radius: 10px;
+      background: var(--banana-dark);
       color: white;
       cursor: pointer;
-      margin-top: 10px;
+      margin-top: 8px;
+      transition: transform 0.15s ease, background 0.15s ease;
+      font-weight: 700;
+      letter-spacing: 0.04em;
     }
+
     button:hover {
-      background: #cf8a26;
+      background: #c77f1a;
+      transform: translateY(-1px);
+    }
+
+    #gameCanvas {
+      display: none;
+      width: 100%;
+      max-width: 720px;
+      background: linear-gradient(#bfe3ff, #dff9c5 62%, #9ad96a 62%, #5ab153 100%);
+      border: 6px solid #e9c56f;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(89, 56, 16, 0.15);
+      margin: 18px auto 0;
+    }
+
+    #hud {
+      max-width: 720px;
+      margin: 14px auto 0;
+      display: none;
+      justify-content: space-between;
+      font-weight: 700;
+      color: var(--text);
+      background: rgba(255,255,255,0.55);
+      border-radius: 10px;
+      padding: 10px 14px;
     }
   </style>
 </head>
 <body>
-  <h1>🍌 BANANA BABY 
-   The Game 🍌</h1>
-  <p>CAN YOU SAVE COCOLUT ISLAND?</p>
+  <h1>🍌 BANANA BABY<br>The Game 🍌</h1>
+  <p>CAN YOU SAVE COCONUT ISLAND?</p>
   <p><img src="banana_baby.png" alt="Banana Baby illustration"></p>
 
   <div class="box">
     <p id="message">Get ready for BANANA BABY The Game!</p>
-    <button onclick="start2-d-game()">START GAME</button>
+    <button id="startButton" type="button">START GAME</button>
   </div>
 
+  <div id="hud">
+    <span id="scoreText">Bananas: 0</span>
+    <span id="livesText">Lives: 3</span>
+  </div>
+
+  <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby 2D game canvas"></canvas>
+
   <script>
-    function start2-d-game() {
-      document.getElementById("message").innerText = "Howdy! 🎉";
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const messageEl = document.getElementById('message');
+    const startButton = document.getElementById('startButton');
+    const hud = document.getElementById('hud');
+    const scoreText = document.getElementById('scoreText');
+    const livesText = document.getElementById('livesText');
+
+    const keys = {};
+    const game = {
+      started: false,
+      over: false,
+      score: 0,
+      lives: 3,
+      lastTime: 0,
+      bananaGoal: 8,
+      invulnerable: 0,
+      player: {
+        x: 90,
+        y: 200,
+        r: 18,
+        speed: 4.2
+      },
+      bananas: [],
+      coconuts: []
+    };
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
     }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function spawnBanana() {
+      const banana = {
+        x: 60 + Math.random() * (canvas.width - 120),
+        y: 60 + Math.random() * (canvas.height - 120),
+        r: 12
+      };
+      for (let i = 0; i < game.coconuts.length; i++) {
+        if (distance(banana, game.coconuts[i]) < banana.r + game.coconuts[i].r + 20) {
+          return spawnBanana();
+        }
+      }
+      game.bananas.push(banana);
+    }
+
+    function spawnCoconut() {
+      const coconut = {
+        x: 60 + Math.random() * (canvas.width - 120),
+        y: 60 + Math.random() * (canvas.height - 120),
+        r: 20,
+        drift: Math.random() * Math.PI * 2,
+        speed: 0.8 + Math.random() * 1.5
+      };
+      if (distance(coconut, game.player) < 80) {
+        return spawnCoconut();
+      }
+      game.coconuts.push(coconut);
+    }
+
+    function resetGame() {
+      game.started = true;
+      game.over = false;
+      game.score = 0;
+      game.lives = 3;
+      game.invulnerable = 0;
+      game.player.x = 90;
+      game.player.y = 200;
+      game.bananas = [];
+      game.coconuts = [];
+
+      for (let i = 0; i < 8; i++) {
+        spawnBanana();
+      }
+      for (let i = 0; i < 4; i++) {
+        spawnCoconut();
+      }
+
+      scoreText.textContent = `Bananas: ${game.score}`;
+      livesText.textContent = `Lives: ${game.lives}`;
+      messageEl.textContent = 'Collect bananas and dodge the coconuts!';
+      startButton.textContent = 'PLAY AGAIN';
+      hud.style.display = 'flex';
+      canvas.style.display = 'block';
+    }
+
+    function startGame() {
+      resetGame();
+    }
+
+    function handleInput() {
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['arrowright'] || keys['d']) dx += 1;
+      if (keys['arrowleft'] || keys['a']) dx -= 1;
+      if (keys['arrowdown'] || keys['s']) dy += 1;
+      if (keys['arrowup'] || keys['w']) dy -= 1;
+
+      const magnitude = Math.hypot(dx, dy) || 1;
+      game.player.x += (dx / magnitude) * game.player.speed;
+      game.player.y += (dy / magnitude) * game.player.speed;
+
+      game.player.x = clamp(game.player.x, game.player.r, canvas.width - game.player.r);
+      game.player.y = clamp(game.player.y, game.player.r, canvas.height - game.player.r);
+    }
+
+    function updateCoconuts() {
+      for (let i = 0; i < game.coconuts.length; i++) {
+        const coconut = game.coconuts[i];
+        coconut.drift += 0.03;
+        coconut.x += Math.cos(coconut.drift) * coconut.speed;
+        coconut.y += Math.sin(coconut.drift * 1.8) * coconut.speed;
+
+        if (coconut.x < coconut.r || coconut.x > canvas.width - coconut.r) {
+          coconut.x = clamp(coconut.x, coconut.r, canvas.width - coconut.r);
+          coconut.drift += Math.PI * 0.8;
+        }
+        if (coconut.y < coconut.r || coconut.y > canvas.height - coconut.r) {
+          coconut.y = clamp(coconut.y, coconut.r, canvas.height - coconut.r);
+          coconut.drift += Math.PI * 0.8;
+        }
+
+        if (distance(game.player, coconut) < game.player.r + coconut.r) {
+          if (game.invulnerable <= 0) {
+            game.lives -= 1;
+            game.invulnerable = 90;
+            messageEl.textContent = `Ouch! ${game.lives} lives left.`;
+            if (game.lives <= 0) {
+              game.over = true;
+              messageEl.textContent = 'Game over! Press PLAY AGAIN to save Coconut Island.';
+              startButton.textContent = 'PLAY AGAIN';
+            }
+          }
+        }
+      }
+    }
+
+    function updateBananas() {
+      for (let i = game.bananas.length - 1; i >= 0; i--) {
+        const banana = game.bananas[i];
+        if (distance(game.player, banana) < game.player.r + banana.r) {
+          game.bananas.splice(i, 1);
+          game.score += 1;
+          messageEl.textContent = `Nice! ${game.score}/${game.bananaGoal} bananas collected.`;
+          scoreText.textContent = `Bananas: ${game.score}`;
+
+          if (game.score >= game.bananaGoal) {
+            game.over = true;
+            messageEl.textContent = 'You saved Coconut Island! Press PLAY AGAIN for another round.';
+            startButton.textContent = 'PLAY AGAIN';
+          } else {
+            spawnBanana();
+          }
+        }
+      }
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#c7ecff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#7ad57c';
+      ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
+
+      ctx.fillStyle = '#78b65f';
+      for (let i = 0; i < 12; i++) {
+        const x = (i * 70) % canvas.width;
+        const y = canvas.height * 0.72 + (i % 3) * 12;
+        ctx.fillRect(x, y, 20, 32);
+      }
+    }
+
+    function drawPlayer() {
+      const { x, y, r } = game.player;
+
+      if (game.invulnerable > 0 && Math.floor(game.invulnerable / 8) % 2 === 0) {
+        return;
+      }
+
+      ctx.fillStyle = '#f5c76b';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#6ab74a';
+      ctx.beginPath();
+      ctx.moveTo(x + 12, y - 8);
+      ctx.lineTo(x + 24, y - 3);
+      ctx.lineTo(x + 14, y + 7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.arc(x - 5, y - 3, 2.2, 0, Math.PI * 2);
+      ctx.arc(x + 5, y - 3, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(x, y + 5, 5, 0, Math.PI);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawBanana(banana) {
+      ctx.fillStyle = '#f4ca45';
+      ctx.beginPath();
+      ctx.ellipse(banana.x, banana.y, banana.r + 5, banana.r, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#c28a1c';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(banana.x - 10, banana.y);
+      ctx.lineTo(banana.x + 10, banana.y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#6bbf59';
+      ctx.beginPath();
+      ctx.moveTo(banana.x, banana.y - banana.r - 4);
+      ctx.lineTo(banana.x + 5, banana.y - banana.r - 12);
+      ctx.lineTo(banana.x + 2, banana.y - banana.r - 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawCoconut(coconut) {
+      ctx.fillStyle = '#8d5d3a';
+      ctx.beginPath();
+      ctx.arc(coconut.x, coconut.y, coconut.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#5a341f';
+      ctx.beginPath();
+      ctx.arc(coconut.x, coconut.y + 2, coconut.r * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#4d2d19';
+      ctx.beginPath();
+      ctx.moveTo(coconut.x - 4, coconut.y - coconut.r + 4);
+      ctx.lineTo(coconut.x + 4, coconut.y - coconut.r + 4);
+      ctx.lineTo(coconut.x + 2, coconut.y - coconut.r + 12);
+      ctx.lineTo(coconut.x - 2, coconut.y - coconut.r + 12);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function draw() {
+      drawBackground();
+
+      for (let i = 0; i < game.bananas.length; i++) {
+        drawBanana(game.bananas[i]);
+      }
+
+      for (let i = 0; i < game.coconuts.length; i++) {
+        drawCoconut(game.coconuts[i]);
+      }
+
+      drawPlayer();
+    }
+
+    function gameLoop(timestamp) {
+      const delta = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.8);
+      game.lastTime = timestamp;
+
+      if (game.started && !game.over) {
+        handleInput();
+        updateCoconuts();
+        updateBananas();
+        if (game.invulnerable > 0) game.invulnerable -= delta;
+      }
+
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    startButton.addEventListener('click', startGame);
+    window.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      keys[key] = true;
+      keys[event.key] = true;
+
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(event.key.toLowerCase())) {
+        event.preventDefault();
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      const key = event.key.toLowerCase();
+      keys[key] = false;
+      keys[event.key] = false;
+    });
+
+    requestAnimationFrame(gameLoop);
   </script>
 </body>
 </html>
