@@ -109,6 +109,7 @@
       box-shadow: 0 8px 20px rgba(89, 56, 16, 0.15);
       margin: 18px auto 0;
       cursor: crosshair;
+      touch-action: none;
     }
 
     .touch-controls {
@@ -224,7 +225,10 @@
       boss: null,
       bossSpawned: false,
       bossDefeated: false,
-      enemyShots: []
+      enemyShots: [],
+      pointerTarget: null,
+      dragging: false,
+      ignoreNextClick: false
     };
 
     function rand(min, max) { return min + Math.random() * (max - min); }
@@ -310,6 +314,9 @@
       game.bullets = [];
       game.enemyShots = [];
       game.particles = [];
+      game.pointerTarget = null;
+      game.dragging = false;
+      game.ignoreNextClick = false;
       game.player.x = canvas.width / 2;
       game.player.y = canvas.height - 50;
       game.boss = null;
@@ -408,7 +415,28 @@
       killEnemy(enemyIndex, false);
     }
 
+    function updatePointerFollow() {
+      if (!game.pointerTarget) return;
+      const dx = game.pointerTarget.x - game.player.x;
+      const dy = game.pointerTarget.y - game.player.y;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      if (dist > 1) {
+        const step = Math.min(dist, game.player.speed + 1.4);
+        game.player.x += (dx / dist) * step;
+        game.player.y += (dy / dist) * step;
+      }
+
+      game.player.x = clamp(game.player.x, 52, canvas.width - 52);
+      game.player.y = clamp(game.player.y, 42, canvas.height - 42);
+    }
+
     function handleMovement() {
+      if (game.dragging && game.pointerTarget) {
+        updatePointerFollow();
+        return;
+      }
+
       let dx = 0;
       let dy = 0;
       if (keys['arrowright'] || keys['d']) dx += 1;
@@ -845,6 +873,11 @@
 
     function onCanvasClick(event) {
       if (!game.started || game.over) return;
+      if (game.ignoreNextClick) {
+        game.ignoreNextClick = false;
+        return;
+      }
+
       const pointer = getPointerPosition(event);
       let targetHit = false;
 
@@ -880,6 +913,37 @@
       button.addEventListener('pointerleave', () => setPressed(false));
       button.addEventListener('pointercancel', () => setPressed(false));
     }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      if (!game.started || game.over) return;
+      const pointer = getPointerPosition(event);
+      game.dragging = true;
+      game.pointerTarget = pointer;
+      game.ignoreNextClick = false;
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!game.dragging || !game.started || game.over) return;
+      const pointer = getPointerPosition(event);
+      const moved = Math.hypot(pointer.x - game.player.x, pointer.y - game.player.y) > 8;
+      if (moved) {
+        game.pointerTarget = pointer;
+        game.ignoreNextClick = true;
+      }
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      game.dragging = false;
+      game.pointerTarget = null;
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      if (game.dragging) {
+        game.dragging = false;
+        game.pointerTarget = null;
+      }
+    });
 
     startButton.addEventListener('click', resetGame);
     canvas.addEventListener('click', onCanvasClick);
