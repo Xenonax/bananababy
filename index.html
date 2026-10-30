@@ -68,6 +68,16 @@
       color: var(--text);
     }
 
+    .subtitle {
+      min-height: 24px;
+      font-weight: 700;
+      color: #7a4b18;
+      font-size: 0.96rem;
+      letter-spacing: 0.02em;
+      opacity: 0.95;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    }
+
     button {
       font-size: 1rem;
       padding: 12px 22px;
@@ -171,6 +181,7 @@
 
   <div class="box">
     <p id="message">Get ready for BANANA BABY The Game!</p>
+    <div id="subtitle" class="subtitle">Fruit Fly threat incoming...</div>
     <button id="startButton" type="button">START GAME</button>
   </div>
 
@@ -197,6 +208,7 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const messageEl = document.getElementById('message');
+    const subtitleEl = document.getElementById('subtitle');
     const startButton = document.getElementById('startButton');
     const hud = document.getElementById('hud');
     const scoreText = document.getElementById('scoreText');
@@ -287,6 +299,9 @@
       boss: null,
       bossSpawned: false,
       bossDefeated: false,
+      bossGoal: 3,
+      bossesDefeated: 0,
+      subtitleTimer: 0,
       enemyShots: [],
       pointerTarget: null,
       dragging: false,
@@ -298,6 +313,12 @@
 
     function rand(min, max) { return min + Math.random() * (max - min); }
     function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+
+    function setSubtitle(text, duration = 120) {
+      subtitleEl.textContent = text;
+      game.subtitleTimer = duration;
+      subtitleEl.style.opacity = '1';
+    }
 
     function setCombo(multiplier) {
       game.combo = multiplier;
@@ -311,6 +332,12 @@
       } else if (game.combo > 1) {
         game.combo = 1;
         comboText.textContent = 'Combo: x1';
+      }
+
+      if (game.subtitleTimer > 0) {
+        game.subtitleTimer -= 1;
+      } else {
+        subtitleEl.style.opacity = '0.78';
       }
     }
 
@@ -392,6 +419,7 @@
         subtitle: 'Banana Baby wins the day!',
         footer: 'The Fruit Fly King is down. The island is safe.'
       };
+      setSubtitle('Coconut Island is safe!', 200);
       audio.victory();
     }
 
@@ -414,19 +442,23 @@
       game.autoFireCooldown = 0;
       game.cutscene = null;
       game.bossExplosion = [];
+      game.boss = null;
+      game.bossSpawned = false;
+      game.bossDefeated = false;
+      game.bossGoal = 3;
+      game.bossesDefeated = 0;
+      game.subtitleTimer = 0;
       game.player.x = canvas.width / 2;
       game.player.y = canvas.height - 50;
       game.player.vx = 0;
       game.player.vy = 0;
-      game.boss = null;
-      game.bossSpawned = false;
-      game.bossDefeated = false;
       initClouds();
 
       scoreText.textContent = 'Score: 0';
       comboText.textContent = 'Combo: x1';
       livesText.textContent = 'Lives: 5';
       messageEl.textContent = 'Tap the Fruit Fly Guys and blast them with banana shots!';
+      setSubtitle('Three bosses stand between you and victory.', 180);
       startButton.textContent = 'PLAY AGAIN';
       hud.style.display = 'flex';
       canvas.style.display = 'block';
@@ -481,11 +513,21 @@
         game.boss = null;
         game.bossSpawned = false;
         game.bossDefeated = true;
-        game.over = true;
+
         scoreText.textContent = 'Score: ' + game.score;
-        messageEl.textContent = 'You saved Coconut Island! The Fruit Fly King is defeated!';
-        startButton.textContent = 'PLAY AGAIN';
-        startVictoryCutscene();
+        game.bossesDefeated += 1;
+
+        if (game.bossesDefeated >= game.bossGoal) {
+          game.over = true;
+          messageEl.textContent = 'You saved Coconut Island! The Fruit Fly Kings are defeated!';
+          startButton.textContent = 'PLAY AGAIN';
+          setSubtitle('Final boss defeated! The island is safe!', 180);
+          startVictoryCutscene();
+          return;
+        }
+
+        messageEl.textContent = 'Boss defeated! Another one is coming!';
+        setSubtitle('Boss ' + (game.bossesDefeated + 1) + ' is approaching...', 180);
         return;
       }
 
@@ -507,11 +549,16 @@
     }
 
     function checkBossSpawn() {
-      if (game.boss || game.bossDefeated || game.score < 8 || game.bossSpawned) return;
+      if (game.over || game.boss || game.bossDefeated) return;
+      if (game.score < 8 + game.bossesDefeated * 8) return;
+      if (game.bossesDefeated >= game.bossGoal) return;
+      if (game.bossSpawned) return;
+
       game.bossSpawned = true;
       game.boss = makeBoss();
       game.enemies.push(game.boss);
-      messageEl.textContent = 'Boss fight! The Fruit Fly King is here!';
+      messageEl.textContent = 'Boss fight! Fruit Fly King ' + (game.bossesDefeated + 1) + ' is here!';
+      setSubtitle('Boss ' + (game.bossesDefeated + 1) + ' arrives!', 170);
       audio.bossSpawn();
     }
 
@@ -526,6 +573,7 @@
           killEnemy(enemyIndex, true);
         } else {
           messageEl.textContent = 'Boss hit! Keep piling on the damage!';
+          setSubtitle('Boss is still standing! Keep attacking!', 120);
         }
         return;
       }
@@ -627,6 +675,7 @@
           game.lives -= 1;
           livesText.textContent = 'Lives: ' + game.lives;
           messageEl.textContent = 'The boss shot you! Stay moving!';
+          setSubtitle('That one hurt! Keep it moving!', 120);
           audio.lose();
 
           if (game.lives <= 0) {
@@ -690,6 +739,7 @@
           game.lives -= 1;
           livesText.textContent = 'Lives: ' + game.lives;
           messageEl.textContent = 'A Fruit Fly Guy stole cash! Watch out!';
+          setSubtitle('No! Another one slipped through!', 120);
 
           if (game.lives <= 0) {
             game.over = true;
@@ -1054,9 +1104,6 @@
           updateClouds();
           updateCutscene();
           checkBossSpawn();
-          if (game.score >= 10 && !game.boss && !game.bossDefeated) {
-            checkBossSpawn();
-          }
           draw();
         }
       } else {
