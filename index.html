@@ -223,6 +223,7 @@
       clouds: [],
       boss: null,
       bossSpawned: false,
+      bossDefeated: false,
       enemyShots: []
     };
 
@@ -313,6 +314,7 @@
       game.player.y = canvas.height - 50;
       game.boss = null;
       game.bossSpawned = false;
+      game.bossDefeated = false;
       initClouds();
 
       scoreText.textContent = 'Score: 0';
@@ -368,17 +370,21 @@
         game.score += 8 * game.combo;
         game.boss = null;
         game.bossSpawned = false;
-        messageEl.textContent = 'Boss down! Coconut Island is turning in your favor!';
-      } else {
-        game.score += 1 * game.combo;
+        game.bossDefeated = true;
+        game.over = true;
+        scoreText.textContent = 'Score: ' + game.score;
+        messageEl.textContent = 'You saved Coconut Island! The Fruit Fly King is defeated!';
+        startButton.textContent = 'PLAY AGAIN';
+        return;
       }
 
+      game.score += 1 * game.combo;
       scoreText.textContent = 'Score: ' + game.score;
       if (game.combo < 6) setCombo(Math.min(game.combo + 1, 6));
     }
 
     function checkBossSpawn() {
-      if (game.boss || game.score < 8 || game.bossSpawned) return;
+      if (game.boss || game.bossDefeated || game.score < 8 || game.bossSpawned) return;
       game.bossSpawned = true;
       game.boss = makeBoss();
       game.enemies.push(game.boss);
@@ -482,7 +488,7 @@
 
     function updateEnemies() {
       game.spawnTimer += 1;
-      if (!game.boss && game.spawnTimer > 42) {
+      if (!game.boss && !game.bossDefeated && game.spawnTimer > 42) {
         game.spawnTimer = 0;
         if (game.enemies.filter(e => !e.boss).length < 10) {
           game.enemies.push(makeEnemy());
