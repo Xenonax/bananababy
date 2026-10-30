@@ -550,7 +550,7 @@
 
     function checkBossSpawn() {
       if (game.over || game.boss || game.bossDefeated) return;
-      if (game.score < 6 + game.bossesDefeated * 8) return;
+      if (game.score < 2 + game.bossesDefeated * 3) return;
       if (game.bossesDefeated >= game.bossGoal) return;
       if (game.bossSpawned) return;
 
