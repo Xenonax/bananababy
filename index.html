@@ -217,7 +217,7 @@
       targetScore: 18,
       lastTime: 0,
       spawnTimer: 0,
-      player: { x: 360, y: 350, r: 26, speed: 6 },
+      player: { x: 360, y: 350, r: 26, speed: 6, vx: 0, vy: 0 },
       enemies: [],
       bullets: [],
       particles: [],
@@ -228,7 +228,8 @@
       enemyShots: [],
       pointerTarget: null,
       dragging: false,
-      ignoreNextClick: false
+      ignoreNextClick: false,
+      autoFireCooldown: 0
     };
 
     function rand(min, max) { return min + Math.random() * (max - min); }
@@ -317,8 +318,11 @@
       game.pointerTarget = null;
       game.dragging = false;
       game.ignoreNextClick = false;
+      game.autoFireCooldown = 0;
       game.player.x = canvas.width / 2;
       game.player.y = canvas.height - 50;
+      game.player.vx = 0;
+      game.player.vy = 0;
       game.boss = null;
       game.bossSpawned = false;
       game.bossDefeated = false;
@@ -417,15 +421,19 @@
 
     function updatePointerFollow() {
       if (!game.pointerTarget) return;
-      const dx = game.pointerTarget.x - game.player.x;
-      const dy = game.pointerTarget.y - game.player.y;
-      const dist = Math.hypot(dx, dy) || 1;
 
-      if (dist > 1) {
-        const step = Math.min(dist, game.player.speed + 1.4);
-        game.player.x += (dx / dist) * step;
-        game.player.y += (dy / dist) * step;
-      }
+      const targetX = game.pointerTarget.x;
+      const targetY = game.pointerTarget.y;
+      const dx = targetX - game.player.x;
+      const dy = targetY - game.player.y;
+
+      game.player.vx += dx * 0.12;
+      game.player.vy += dy * 0.12;
+      game.player.vx *= 0.78;
+      game.player.vy *= 0.78;
+
+      game.player.x += game.player.vx;
+      game.player.y += game.player.vy;
 
       game.player.x = clamp(game.player.x, 52, canvas.width - 52);
       game.player.y = clamp(game.player.y, 42, canvas.height - 42);
@@ -434,6 +442,11 @@
     function handleMovement() {
       if (game.dragging && game.pointerTarget) {
         updatePointerFollow();
+        if (game.autoFireCooldown > 0) game.autoFireCooldown -= 1;
+        if (game.autoFireCooldown <= 0) {
+          shootBanana(game.pointerTarget.x, game.pointerTarget.y);
+          game.autoFireCooldown = 140;
+        }
         return;
       }
 
@@ -919,7 +932,8 @@
       const pointer = getPointerPosition(event);
       game.dragging = true;
       game.pointerTarget = pointer;
-      game.ignoreNextClick = false;
+      game.ignoreNextClick = true;
+      game.autoFireCooldown = 0;
       canvas.setPointerCapture?.(event.pointerId);
     });
 
@@ -936,12 +950,14 @@
     canvas.addEventListener('pointerup', () => {
       game.dragging = false;
       game.pointerTarget = null;
+      game.autoFireCooldown = 0;
     });
 
     canvas.addEventListener('pointerleave', () => {
       if (game.dragging) {
         game.dragging = false;
         game.pointerTarget = null;
+        game.autoFireCooldown = 0;
       }
     });
 
