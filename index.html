@@ -11,7 +11,6 @@
       --sky: #fffbe8;
       --grass: #6bbd63;
       --text: #3b2a1d;
-      --shadow: rgba(0,0,0,0.14);
     }
 
     * { box-sizing: border-box; }
@@ -120,7 +119,7 @@
     <span id="livesText">Lives: 3</span>
   </div>
 
-  <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby shooter game canvas"></canvas>
+  <canvas id="gameCanvas" width="720" height="420" aria-label="Banana Baby 3D-inspired shooter game"></canvas>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
@@ -150,9 +149,8 @@
       particles: []
     };
 
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
+    function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+    function rand(min, max) { return min + Math.random() * (max - min); }
 
     function getPointerPosition(event) {
       const rect = canvas.getBoundingClientRect();
@@ -166,13 +164,14 @@
 
     function makeEnemy() {
       return {
-        x: 50 + Math.random() * (canvas.width - 100),
+        x: rand(50, canvas.width - 50),
         y: -20,
-        r: 18 + Math.random() * 12,
-        speed: 1.4 + Math.random() * 1.4,
+        r: rand(16, 28),
+        speed: rand(1.3, 2.4),
         drift: Math.random() * Math.PI * 2,
         phase: Math.random() * 100,
-        bag: Math.random() > 0.5
+        bag: Math.random() > 0.5,
+        z: rand(0.7, 1.7)
       };
     }
 
@@ -237,7 +236,6 @@
     function handleMovement() {
       let dx = 0;
       let dy = 0;
-
       if (keys['arrowright'] || keys['d']) dx += 1;
       if (keys['arrowleft'] || keys['a']) dx -= 1;
       if (keys['arrowdown'] || keys['s']) dy += 1;
@@ -266,7 +264,7 @@
         if (dist <= bullet.speed + 1) {
           for (let j = 0; j < game.enemies.length; j++) {
             const enemy = game.enemies[j];
-            if (Math.hypot(enemy.x - bullet.targetX, enemy.y - bullet.targetY) <= enemy.r + 8) {
+            if (Math.hypot(enemy.x - bullet.targetX, enemy.y - bullet.targetY) <= enemy.r + 10) {
               hitEnemy(j);
               game.bullets.splice(i, 1);
               return;
@@ -285,7 +283,7 @@
 
     function updateEnemies() {
       game.spawnTimer += 1;
-      if (game.spawnTimer > 46) {
+      if (game.spawnTimer > 44) {
         game.spawnTimer = 0;
         if (game.enemies.length < 10) {
           game.enemies.push(makeEnemy());
@@ -294,10 +292,10 @@
 
       for (let i = game.enemies.length - 1; i >= 0; i--) {
         const enemy = game.enemies[i];
-        enemy.y += enemy.speed;
-        enemy.x += Math.sin((enemy.y + enemy.phase) * 0.12) * 2.1;
+        enemy.y += enemy.speed * 1.2;
+        enemy.x += Math.sin((enemy.y + enemy.phase) * 0.15) * (2.2 * enemy.z);
 
-        if (enemy.y > canvas.height - 18) {
+        if (enemy.y > canvas.height - 12) {
           game.enemies.splice(i, 1);
           game.lives -= 1;
           livesText.textContent = 'Lives: ' + game.lives;
@@ -318,71 +316,93 @@
         p.x += p.vx;
         p.y += p.vy;
         p.life -= 1;
-        if (p.life <= 0) {
-          game.particles.splice(i, 1);
-        }
+        if (p.life <= 0) game.particles.splice(i, 1);
       }
     }
 
     function drawBackground() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#bfe9ff';
+
+      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      sky.addColorStop(0, '#bfe9ff');
+      sky.addColorStop(0.7, '#dff9c5');
+      sky.addColorStop(0.7, '#9ad96a');
+      sky.addColorStop(1, '#5ab153');
+      ctx.fillStyle = sky;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      for (let i = 0; i < 8; i++) {
+        const sx = 60 + i * 90;
+        const sy = 30 + (i % 2) * 30;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.fillStyle = '#7ecf72';
       ctx.fillRect(0, canvas.height * 0.72, canvas.width, canvas.height * 0.28);
 
-      for (let i = 0; i < 14; i++) {
-        const x = (i * 60) % canvas.width;
-        const y = canvas.height * 0.74 + (i % 3) * 12;
+      for (let i = 0; i < 15; i++) {
+        const x = (i * 58) % canvas.width;
+        const y = canvas.height * 0.75 + (i % 3) * 14;
         ctx.fillStyle = '#6bbf59';
-        ctx.fillRect(x, y, 22, 30);
+        ctx.fillRect(x, y, 25, 32);
       }
+
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(0, canvas.height * 0.7, canvas.width, 10);
     }
 
     function drawPlayer() {
       const { x, y, r } = game.player;
 
       if (playerImage.complete && playerImage.naturalWidth > 0) {
-        ctx.drawImage(playerImage, x - 28, y - 28, 56, 56);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.drawImage(playerImage, -28, -28, 56, 56);
+        ctx.restore();
         return;
       }
 
+      ctx.save();
+      ctx.translate(x, y);
       ctx.fillStyle = '#f6cf5d';
       ctx.beginPath();
-      ctx.ellipse(x, y, r * 0.95, r * 1.05, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, r * 0.95, r * 1.05, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#d4a126';
       ctx.beginPath();
-      ctx.moveTo(x - 12, y - 10);
-      ctx.lineTo(x + 12, y - 18);
-      ctx.lineTo(x + 10, y - 4);
-      ctx.lineTo(x - 10, y - 2);
+      ctx.moveTo(-12, -10);
+      ctx.lineTo(12, -18);
+      ctx.lineTo(10, -4);
+      ctx.lineTo(-10, -2);
       ctx.closePath();
       ctx.fill();
 
       ctx.fillStyle = '#222';
       ctx.beginPath();
-      ctx.arc(x - 7, y - 4, 2.3, 0, Math.PI * 2);
-      ctx.arc(x + 7, y - 4, 2.3, 0, Math.PI * 2);
+      ctx.arc(-7, -4, 2.3, 0, Math.PI * 2);
+      ctx.arc(7, -4, 2.3, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = '#222';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(x, y + 6, 6, 0.1, Math.PI - 0.1);
+      ctx.arc(0, 6, 6, 0.1, Math.PI - 0.1);
       ctx.stroke();
+      ctx.restore();
     }
 
     function drawEnemy(enemy) {
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
+      ctx.scale(1, 1 + (enemy.z - 1) * 0.3);
 
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
       ctx.beginPath();
-      ctx.ellipse(-12, -2, 18, 10, -0.6, 0, Math.PI * 2);
-      ctx.ellipse(12, -2, 18, 10, 0.6, 0, Math.PI * 2);
+      ctx.ellipse(0, enemy.r + 8, enemy.r * 1.4, enemy.r * 0.6, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#7b7b7b';
@@ -410,14 +430,10 @@
       ctx.strokeStyle = '#3a3a3a';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-12, 3);
-      ctx.lineTo(-22, 18);
-      ctx.moveTo(12, 3);
-      ctx.lineTo(22, 18);
-      ctx.moveTo(-8, 16);
-      ctx.lineTo(-12, 26);
-      ctx.moveTo(8, 16);
-      ctx.lineTo(12, 26);
+      ctx.moveTo(-12, 3); ctx.lineTo(-22, 18);
+      ctx.moveTo(12, 3); ctx.lineTo(22, 18);
+      ctx.moveTo(-8, 16); ctx.lineTo(-12, 26);
+      ctx.moveTo(8, 16); ctx.lineTo(12, 26);
       ctx.stroke();
 
       if (enemy.bag) {
@@ -429,7 +445,6 @@
 
       ctx.fillStyle = '#2c2c2c';
       ctx.fillRect(-4, 22, 8, 4);
-
       ctx.restore();
     }
 
@@ -466,7 +481,7 @@
 
     function gameLoop(timestamp) {
       if (game.lastTime === 0) game.lastTime = timestamp;
-      const delta = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.6);
+      const dt = Math.min((timestamp - game.lastTime) / 16.7 || 1, 1.6);
       game.lastTime = timestamp;
 
       if (game.started && !game.over) {
@@ -505,9 +520,7 @@
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
       keys[key] = true;
-      if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) {
-        event.preventDefault();
-      }
+      if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) event.preventDefault();
     });
 
     window.addEventListener('keyup', (event) => {
