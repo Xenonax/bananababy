@@ -614,9 +614,17 @@
 
       const bodyColor = isQueen ? '#6c5ab5' : '#7f7f7f';
       const headColor = isQueen ? '#604fa8' : '#5e5e5e';
-      const goldColor = isQueen ? '#d9c1ff' : '#c2a15a';
+      const goldColor = isQueen ? '#ebe0ff' : '#c2a15a';
       const trimColor = isQueen ? '#7ce2d4' : '#d9d9d9';
-      const accentColor = isQueen ? '#7ce2d4' : '#9a6b2b';
+      const accentColor = isQueen ? '#8ef0d8' : '#9a6b2b';
+
+      if (isQueen) {
+        ctx.fillStyle = 'rgba(124, 226, 212, 0.22)';
+        ctx.beginPath();
+        ctx.ellipse(-56, -8, 28, 18, -0.9, 0, Math.PI * 2);
+        ctx.ellipse(56, -8, 28, 18, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.fillStyle = bodyColor;
       ctx.beginPath();
@@ -639,6 +647,25 @@
       ctx.arc(-12, -32, 3.5, 0, Math.PI * 2);
       ctx.arc(12, -32, 3.5, 0, Math.PI * 2);
       ctx.fill();
+
+      if (isQueen) {
+        ctx.fillStyle = '#f7e6a3';
+        ctx.beginPath();
+        ctx.moveTo(-18, -54);
+        ctx.lineTo(-10, -64);
+        ctx.lineTo(-2, -54);
+        ctx.lineTo(6, -64);
+        ctx.lineTo(16, -54);
+        ctx.lineTo(20, -46);
+        ctx.lineTo(-20, -46);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#8ef0d8';
+        ctx.fillRect(-14, -62, 6, 8);
+        ctx.fillRect(-2, -66, 6, 10);
+        ctx.fillRect(10, -62, 6, 8);
+      }
 
       ctx.fillStyle = goldColor;
       ctx.fillRect(-10, -45, 20, 8);
@@ -663,12 +690,15 @@
       ctx.fillRect(-5, 34, 10, 8);
 
       if (isQueen) {
-        ctx.fillStyle = '#c8e7ff';
+        ctx.fillStyle = '#d8d4ff';
         ctx.fillRect(-34, -10, 14, 5);
         ctx.fillRect(20, -10, 14, 5);
         ctx.fillStyle = '#7ce2d4';
         ctx.fillRect(-47, 0, 10, 6);
         ctx.fillRect(37, 0, 10, 6);
+        ctx.fillStyle = '#d9c1ff';
+        ctx.fillRect(-18, 6, 14, 16);
+        ctx.fillRect(4, 6, 14, 16);
       } else {
         ctx.fillStyle = '#9a6b2b';
         ctx.fillRect(18, 6, 14, 16);
