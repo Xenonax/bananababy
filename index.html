@@ -148,10 +148,12 @@
       bullets: [],
       enemies: [],
       bosses: [],
+      projectiles: [],
       particles: [],
       clouds: [],
       spawnTimer: 0,
       bossTimer: 0,
+      bossWarning: 0,
       pointerActive: false
     };
 
@@ -188,9 +190,11 @@
       state.bullets = [];
       state.enemies = [];
       state.bosses = [];
+      state.projectiles = [];
       state.particles = [];
       state.spawnTimer = 0;
       state.bossTimer = 0;
+      state.bossWarning = 0;
       state.player.x = canvas.width / 2;
       state.player.y = canvas.height - 48;
       state.player.targetX = state.player.x;
@@ -235,13 +239,16 @@
         x: rand(90, canvas.width - 90),
         y: -60,
         radius: rand(28, 36),
-        speed: rand(0.7, 1.1),
+        speed: rand(0.7, 1.05),
         drift: rand(-1.2, 1.2),
         phase: rand(0, Math.PI * 2),
-        hp: 3
+        hp: 3,
+        shotCooldown: 70
       };
       state.bosses.push(boss);
-      setSubtitle('Boss incoming!');
+      state.bossWarning = 120;
+      messageEl.textContent = 'BOSS WARNING!';
+      setSubtitle('A giant fruit boss is on the way!');
     }
 
     function explosion(x, y, color) {
@@ -312,6 +319,7 @@
                 state.score += 50;
                 scoreText.textContent = 'Score: ' + state.score;
                 explosion(boss.x, boss.y, '#ffc857');
+                messageEl.textContent = 'The boss is down!';
               }
               break;
             }
@@ -329,6 +337,33 @@
       }
     }
 
+    function updateProjectiles() {
+      for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        const p = state.projectiles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (Math.hypot(p.x - state.player.x, p.y - state.player.y) <= p.radius + state.player.radius) {
+          state.projectiles.splice(i, 1);
+          state.lives -= 1;
+          livesText.textContent = 'Lives: ' + state.lives;
+          explosion(state.player.x, state.player.y, '#d64545');
+          setSubtitle('Boss projectile hit!');
+          if (state.lives <= 0) {
+            state.gameOver = true;
+            messageEl.textContent = 'Banana Baby was overwhelmed. Press PLAY AGAIN!';
+            setSubtitle('Try again and stay on the move.');
+            startButton.textContent = 'PLAY AGAIN';
+          }
+          continue;
+        }
+
+        if (p.x < -30 || p.x > canvas.width + 30 || p.y < -30 || p.y > canvas.height + 30) {
+          state.projectiles.splice(i, 1);
+        }
+      }
+    }
+
     function updateEnemies() {
       state.spawnTimer += 1;
       if (state.spawnTimer > 90) {
@@ -340,6 +375,13 @@
       if (state.bossTimer > 420) {
         state.bossTimer = 0;
         spawnBoss();
+      }
+
+      if (state.bossWarning > 0) {
+        state.bossWarning -= 1;
+        if (state.bossWarning === 0) {
+          setSubtitle('Boss incoming!');
+        }
       }
 
       for (let i = state.enemies.length - 1; i >= 0; i--) {
@@ -357,6 +399,25 @@
         const boss = state.bosses[i];
         boss.y += boss.speed;
         boss.x += Math.sin((boss.y + boss.phase) * 0.05) * boss.drift * 2.4;
+
+        if (boss.shotCooldown > 0) {
+          boss.shotCooldown -= 1;
+        } else {
+          const dx = state.player.x - boss.x;
+          const dy = state.player.y - boss.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const vx = (dx / dist) * 2.8;
+          const vy = (dy / dist) * 2.8;
+          state.projectiles.push({
+            x: boss.x,
+            y: boss.y + 10,
+            vx,
+            vy,
+            radius: 6,
+            color: '#fb7185'
+          });
+          boss.shotCooldown = rand(55, 90);
+        }
 
         if (Math.hypot(boss.x - state.player.x, boss.y - state.player.y) <= boss.radius + state.player.radius) {
           state.bosses.splice(i, 1);
@@ -553,6 +614,15 @@
       }
     }
 
+    function drawProjectiles() {
+      for (const projectile of state.projectiles) {
+        ctx.fillStyle = projectile.color || '#fb7185';
+        ctx.beginPath();
+        ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     function drawBullets() {
       for (const bullet of state.bullets) {
         bullet.trail.forEach((point, index) => {
@@ -582,6 +652,7 @@
       drawBackground();
       drawParticles();
       drawBullets();
+      drawProjectiles();
       drawEnemies();
       drawBosses();
       drawPlayer();
@@ -595,6 +666,7 @@
 
       updatePlayer();
       updateBullets();
+      updateProjectiles();
       updateEnemies();
       updateParticles();
       draw();
