@@ -590,41 +590,41 @@
 
     function drawBoss(enemy) {
       const isQueen = enemy.variant === 'queen';
-      const base = isQueen ? '#6a4eb5' : '#4d4d54';
-      const dark = isQueen ? '#382a68' : '#232529';
-      const horn = isQueen ? '#f4df9a' : '#d0d1d3';
-      const deep = isQueen ? '#87ede0' : '#ffb15d';
-      const eye = isQueen ? '#8af0d6' : '#ff4d5f';
-      const trim = isQueen ? '#d9c9ff' : '#ffbb69';
+      const body = isQueen ? '#6551bb' : '#3d3d46';
+      const bodyDark = isQueen ? '#2d214e' : '#17191d';
+      const horn = isQueen ? '#f9ebaf' : '#d5d9dc';
+      const accent = isQueen ? '#8ff1d5' : '#ffb35f';
+      const eye = isQueen ? '#9df5e0' : '#ff5d70';
+      const trim = isQueen ? '#ddd0ff' : '#ffcf88';
 
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
       ctx.rotate(enemy.tilt);
 
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
       ctx.beginPath();
       ctx.ellipse(0, enemy.r + 18, enemy.r * 1.7, enemy.r * 0.8, 0, 0, Math.PI * 2);
       ctx.fill();
 
       if (isQueen) {
-        ctx.fillStyle = 'rgba(142, 240, 216, 0.18)';
+        ctx.fillStyle = 'rgba(143, 241, 213, 0.20)';
         ctx.beginPath();
-        ctx.ellipse(-50, -10, 24, 18, -0.8, 0, Math.PI * 2);
-        ctx.ellipse(50, -10, 24, 18, 0.8, 0, Math.PI * 2);
+        ctx.ellipse(-52, -12, 24, 18, -0.8, 0, Math.PI * 2);
+        ctx.ellipse(52, -12, 24, 18, 0.8, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      ctx.fillStyle = base;
+      ctx.fillStyle = body;
       ctx.beginPath();
-      ctx.ellipse(0, 0, 42, 26, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 42, 25, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = dark;
+      ctx.fillStyle = bodyDark;
       ctx.beginPath();
       ctx.arc(0, -30, 32, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#f6d3d3';
+      ctx.fillStyle = '#f8d7d7';
       ctx.beginPath();
       ctx.arc(-12, -32, 7, 0, Math.PI * 2);
       ctx.arc(12, -32, 7, 0, Math.PI * 2);
@@ -639,41 +639,34 @@
       ctx.fillStyle = horn;
       ctx.beginPath();
       if (isQueen) {
-        ctx.moveTo(-18, -54);
-        ctx.lineTo(-8, -70);
-        ctx.lineTo(-1, -54);
-        ctx.lineTo(8, -70);
-        ctx.lineTo(18, -54);
-        ctx.lineTo(20, -46);
-        ctx.lineTo(-20, -46);
+        ctx.moveTo(-18, -55);
+        ctx.lineTo(-8, -72);
+        ctx.lineTo(-2, -55);
+        ctx.lineTo(8, -72);
+        ctx.lineTo(18, -55);
+        ctx.lineTo(24, -46);
+        ctx.lineTo(-24, -46);
       } else {
-        ctx.moveTo(-16, -55);
-        ctx.lineTo(-8, -75);
-        ctx.lineTo(-2, -54);
-        ctx.lineTo(8, -75);
-        ctx.lineTo(16, -55);
-        ctx.lineTo(18, -45);
-        ctx.lineTo(-18, -45);
+        ctx.moveTo(-18, -57);
+        ctx.lineTo(-9, -78);
+        ctx.lineTo(-2, -55);
+        ctx.lineTo(9, -78);
+        ctx.lineTo(18, -57);
+        ctx.lineTo(21, -48);
+        ctx.lineTo(-21, -48);
       }
       ctx.closePath();
       ctx.fill();
 
       ctx.fillStyle = trim;
-      ctx.fillRect(-10, -45, 20, 8);
+      ctx.fillRect(-11, -45, 22, 8);
 
-      if (isQueen) {
-        ctx.fillStyle = '#f7e6a3';
-        ctx.fillRect(-14, -63, 6, 8);
-        ctx.fillRect(-2, -67, 6, 10);
-        ctx.fillRect(10, -63, 6, 8);
-      }
-
-      ctx.fillStyle = deep;
+      ctx.fillStyle = accent;
       if (isQueen) {
         ctx.fillRect(-34, 10, 16, 8);
         ctx.fillRect(18, 10, 16, 8);
-        ctx.fillRect(-42, -9, 12, 5);
-        ctx.fillRect(30, -9, 12, 5);
+        ctx.fillRect(-42, -8, 12, 5);
+        ctx.fillRect(30, -8, 12, 5);
       } else {
         ctx.fillRect(-32, 10, 18, 8);
         ctx.fillRect(14, 10, 18, 8);
@@ -681,7 +674,7 @@
         ctx.fillRect(30, -8, 12, 5);
       }
 
-      ctx.strokeStyle = isQueen ? '#3d2d68' : '#26282d';
+      ctx.strokeStyle = isQueen ? '#342a61' : '#23262c';
       ctx.lineWidth = isQueen ? 2 : 3;
       ctx.beginPath();
       ctx.moveTo(-24, 0); ctx.lineTo(-40, 26);
@@ -690,12 +683,17 @@
       ctx.moveTo(18, 17); ctx.lineTo(18, 34);
       ctx.stroke();
 
-      ctx.fillStyle = isQueen ? '#9feee0' : '#ffb35a';
+      ctx.fillStyle = isQueen ? '#aafae6' : '#ffbe68';
       ctx.fillRect(-12, 28, 24, 7);
       ctx.fillStyle = '#2f2f2f';
       ctx.fillRect(-5, 34, 10, 8);
 
       if (isQueen) {
+        ctx.fillStyle = '#f7e6a3';
+        ctx.fillRect(-14, -64, 6, 10);
+        ctx.fillRect(-2, -68, 6, 12);
+        ctx.fillRect(10, -64, 6, 10);
+
         ctx.fillStyle = '#d8d4ff';
         ctx.fillRect(-34, -10, 14, 5);
         ctx.fillRect(20, -10, 14, 5);
@@ -706,10 +704,10 @@
         ctx.fillRect(-18, 6, 14, 16);
         ctx.fillRect(4, 6, 14, 16);
       } else {
-        ctx.fillStyle = '#d6d7db';
-        ctx.fillRect(-26, 0, 14, 18);
-        ctx.fillRect(12, 0, 14, 18);
-        ctx.fillStyle = '#9a6b2b';
+        ctx.fillStyle = '#d9d9dc';
+        ctx.fillRect(-24, 0, 14, 18);
+        ctx.fillRect(10, 0, 14, 18);
+        ctx.fillStyle = '#b07d33';
         ctx.fillRect(-16, 6, 12, 14);
         ctx.fillRect(4, 6, 12, 14);
       }
